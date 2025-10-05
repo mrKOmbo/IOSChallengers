@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct AQIHomeView: View {
     @Binding var showBusinessPulse: Bool
@@ -13,9 +14,8 @@ struct AQIHomeView: View {
     @State private var selectedForecastTab: ForecastTab = .hourly
     @State private var showSearchModal = false
     @State private var searchText = ""
-    @State private var realTimeAQI: AirQualityPoint?
-    @State private var isLoadingRealData = false
     @State private var showARView = false
+    @State private var isLoadingAQI: Bool = false
 
     enum ForecastTab {
         case hourly
@@ -70,6 +70,9 @@ struct AQIHomeView: View {
         .fullScreenCover(isPresented: $showARView) {
             ARParticlesView()
         }
+        .sheet(isPresented: $showSearchModal) {
+            LocationSearchModal(searchText: $searchText, onLocationSelected: handleLocationSelection)
+        }
     }
 
     // MARK: - View Components
@@ -123,14 +126,6 @@ struct AQIHomeView: View {
             }
         }
         .padding(.horizontal)
-        .sheet(isPresented: $showSearchModal) {
-            LocationSearchModal(
-                searchText: $searchText,
-                onCitySelected: { airQuality in
-                    updateWithRealData(airQuality)
-                }
-            )
-        }
     }
 
     private var aqiCard: some View {
@@ -632,37 +627,135 @@ struct AQIHomeView: View {
             )
         ]
     }
+}
 
-    // MARK: - Real Data Integration
+struct DailyForecastCard: View {
+    let forecast: DailyForecastData
 
-    private func updateWithRealData(_ airQuality: AirQualityPoint) {
-        realTimeAQI = airQuality
+    var body: some View {
+        HStack(spacing: 16) {
+            // Left section - Day and Date
+            VStack(alignment: .leading, spacing: 4) {
+                Text(forecast.dayName)
+                    .font(.headline)
+                    .foregroundColor(.white)
 
-        print("\n🔄 ===== ACTUALIZANDO AQI HOME VIEW =====")
-        print("   AQI: \(Int(airQuality.aqi))")
-        print("   PM2.5: \(String(format: "%.1f", airQuality.pm25))")
-        print("   Level: \(airQuality.level.rawValue)")
+                Text(formatDate(forecast.date))
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(width: 85, alignment: .leading)
 
-        // Actualizar airQualityData con datos reales
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            airQualityData = AirQualityData(
-                aqi: Int(airQuality.aqi),
-                pm25: airQuality.pm25,
-                pm10: airQuality.pm10 ?? 0,
-                location: "Selected City",
-                city: "Real Data from Backend",
-                distance: 0.0,
-                temperature: airQualityData.temperature, // Mantener temperatura de muestra
-                humidity: airQualityData.humidity,
-                windSpeed: airQualityData.windSpeed,
-                uvIndex: airQualityData.uvIndex,
-                weatherCondition: airQualityData.weatherCondition,
-                lastUpdate: Date() // Timestamp actual
+            // AQI Badge
+            VStack(spacing: 4) {
+                Text("\(forecast.aqi)")
+                    .font(.title2.bold())
+                    .foregroundColor(.white)
+
+                Text("AQI")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(forecast.aqiColor.opacity(0.3))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(forecast.aqiColor, lineWidth: 2)
+                    )
             )
-        }
 
-        print("✅ AQI Home View actualizado con datos reales")
-        print("===== END UPDATE =====\n")
+            Spacer()
+
+            // Weather section
+            HStack(spacing: 12) {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(forecast.weatherDescription)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+
+                    Text("\(forecast.temp)°C")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+
+                Image(systemName: forecast.weatherIcon)
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .symbolRenderingMode(.multicolor)
+                    .frame(width: 35)
+            }
+
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.4))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial.opacity(0.3))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        )
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+}
+
+extension AQIHomeView {
+    // MARK: - Location Selection Handler
+
+    fileprivate func handleLocationSelection(_ locationString: String) {
+        // Parse location string (e.g., "Mexico City, Mexico")
+        let components = locationString.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        let locationName = components.first ?? locationString
+        let cityName = locationString
+
+        // Fetch AQI data for selected location
+        fetchAQIData(locationName: locationName, cityName: cityName)
+    }
+
+    // MARK: - Fetch AQI Data
+    fileprivate func fetchAQIData(locationName: String, cityName: String) {
+        // Show loading state
+        isLoadingAQI = true
+
+        // Simulate API call - En producción, aquí se haría la llamada real a NASA TEMPO o OpenAQ
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // Create new air quality data with selected location
+            let newAQI = Int.random(in: 50...150)
+            let newPM25 = Double.random(in: 15...35)
+            let newPM10 = Double.random(in: 40...80)
+
+            self.airQualityData = AirQualityData(
+                aqi: newAQI,
+                pm25: newPM25,
+                pm10: newPM10,
+                location: locationName,
+                city: cityName,
+                distance: Double.random(in: 0.5...5.0),
+                temperature: Double.random(in: 15...25),
+                humidity: Int.random(in: 50...80),
+                windSpeed: Double.random(in: 2...8),
+                uvIndex: Int.random(in: 0...5),
+                weatherCondition: .overcast,
+                lastUpdate: Date()
+            )
+
+            // Hide loading state
+            self.isLoadingAQI = false
+        }
     }
 }
 
@@ -1096,20 +1189,16 @@ struct SegmentArc: View {
 
 struct LocationSearchModal: View {
     @Binding var searchText: String
-    let onCitySelected: (AirQualityPoint) -> Void
     @Environment(\.dismiss) var dismiss
     @State private var searchResults: [String] = []
-    @State private var isLoading = false
-    @State private var selectedCityAQI: AirQualityPoint?
-    @State private var showAQIDetail = false
+    var onLocationSelected: (String) -> Void
 
-    // Coordenadas de ciudades predefinidas
-    let quickLocations: [(name: String, icon: String, lat: Double, lon: Double)] = [
-        ("Mexico City, Mexico", "mappin.circle.fill", 19.4326, -99.1332),
-        ("New York, USA", "building.2.fill", 40.7128, -74.0060),
-        ("Tokyo, Japan", "building.fill", 35.6762, 139.6503),
-        ("London, UK", "building.columns.fill", 51.5074, -0.1278),
-        ("Paris, France", "sparkles", 48.8566, 2.3522)
+    let quickLocations = [
+        ("Mexico City, Mexico", "mappin.circle.fill"),
+        ("New York, USA", "building.2.fill"),
+        ("Tokyo, Japan", "building.fill"),
+        ("London, UK", "building.columns.fill"),
+        ("Paris, France", "sparkles")
     ]
 
     var body: some View {
@@ -1189,35 +1278,25 @@ struct LocationSearchModal: View {
 
                             // Quick location buttons
                             VStack(spacing: 12) {
-                                ForEach(quickLocations, id: \.name) { location in
+                                ForEach(quickLocations, id: \.0) { location in
                                     Button(action: {
-                                        fetchAirQualityData(for: location)
+                                        onLocationSelected(location.0)
+                                        dismiss()
                                     }) {
                                         HStack(spacing: 16) {
-                                            Image(systemName: location.icon)
+                                            Image(systemName: location.1)
                                                 .font(.title2)
                                                 .foregroundColor(.white)
                                                 .frame(width: 40)
 
                                             VStack(alignment: .leading, spacing: 4) {
-                                                Text(location.name)
+                                                Text(location.0)
                                                     .font(.body.bold())
                                                     .foregroundColor(.white)
 
-                                                if isLoading {
-                                                    HStack(spacing: 6) {
-                                                        ProgressView()
-                                                            .scaleEffect(0.7)
-                                                            .tint(.white)
-                                                        Text("Loading...")
-                                                            .font(.caption)
-                                                            .foregroundColor(.white.opacity(0.7))
-                                                    }
-                                                } else {
-                                                    Text("Tap to view air quality")
-                                                        .font(.caption)
-                                                        .foregroundColor(.white.opacity(0.7))
-                                                }
+                                                Text("View air quality")
+                                                    .font(.caption)
+                                                    .foregroundColor(.white.opacity(0.7))
                                             }
 
                                             Spacer()
@@ -1235,7 +1314,6 @@ struct LocationSearchModal: View {
                                                 )
                                         )
                                     }
-                                    .disabled(isLoading)
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -1244,6 +1322,7 @@ struct LocationSearchModal: View {
                         VStack(spacing: 12) {
                             ForEach(filteredLocations, id: \.self) { location in
                                 Button(action: {
+                                    onLocationSelected(location)
                                     dismiss()
                                 }) {
                                     HStack(spacing: 16) {
@@ -1305,56 +1384,7 @@ struct LocationSearchModal: View {
             return sampleLocations.filter { $0.lowercased().contains(searchText.lowercased()) }
         }
     }
-
-    // MARK: - Backend Integration
-
-    private func fetchAirQualityData(for location: (name: String, icon: String, lat: Double, lon: Double)) {
-        isLoading = true
-
-        Task {
-            do {
-                print("\n🏙️ ===== AQI HOME VIEW - CIUDAD SELECCIONADA =====")
-                print("📍 Ciudad: \(location.name)")
-                print("   Coordenadas: \(location.lat), \(location.lon)")
-
-                // Consultar backend real
-                let airQuality = try await AirQualityAPIService.shared.getCurrentAQI(
-                    latitude: location.lat,
-                    longitude: location.lon
-                )
-
-                await MainActor.run {
-                    isLoading = false
-                    selectedCityAQI = airQuality
-
-                    print("✅ Datos recibidos - Actualizando vista principal")
-                    print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
-                    print("   PM2.5: \(String(format: "%.1f", airQuality.pm25)) μg/m³")
-                    print("===== END AQI HOME VIEW =====\n")
-
-                    // Llamar callback para actualizar vista principal
-                    onCitySelected(airQuality)
-
-                    // Cerrar modal
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        dismiss()
-                    }
-                }
-
-            } catch {
-                print("\n⚠️ ===== ERROR EN AQI HOME VIEW =====")
-                print("❌ Error: \(error.localizedDescription)")
-                print("===== END ERROR =====\n")
-
-                await MainActor.run {
-                    isLoading = false
-                    // TODO: Mostrar error al usuario
-                }
-            }
-        }
-    }
 }
-
 
 
 // MARK: - Day Comparison Dot
@@ -1411,92 +1441,7 @@ struct DailyForecastData: Identifiable {
     }
 }
 
-struct DailyForecastCard: View {
-    let forecast: DailyForecastData
-
-    var body: some View {
-        HStack(spacing: 16) {
-            // Left section - Day and Date
-            VStack(alignment: .leading, spacing: 4) {
-                Text(forecast.dayName)
-                    .font(.headline)
-                    .foregroundColor(.white)
-
-                Text(formatDate(forecast.date))
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            .frame(width: 85, alignment: .leading)
-
-            // AQI Badge
-            VStack(spacing: 4) {
-                Text("\(forecast.aqi)")
-                    .font(.title2.bold())
-                    .foregroundColor(.white)
-
-                Text("AQI")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(forecast.aqiColor.opacity(0.3))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(forecast.aqiColor, lineWidth: 2)
-                    )
-            )
-
-            Spacer()
-
-            // Weather section
-            HStack(spacing: 12) {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(forecast.weatherDescription)
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-
-                    Text("\(forecast.temp)°C")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-
-                Image(systemName: forecast.weatherIcon)
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .symbolRenderingMode(.multicolor)
-                    .frame(width: 35)
-            }
-
-            // Chevron
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.4))
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial.opacity(0.3))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(.white.opacity(0.2), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        )
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
-}
-
-// MARK: - Preview
-
 #Preview {
     AQIHomeView(showBusinessPulse: .constant(false))
 }
+
