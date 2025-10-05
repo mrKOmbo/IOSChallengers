@@ -509,9 +509,15 @@ struct ScoreBadge: View {
                     .frame(width: 44, height: 44)
                     .rotationEffect(.degrees(-90))
 
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(color)
+                VStack(spacing: 0) {
+                    Image(systemName: icon)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(color)
+
+                    Text("\(Int(score))")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.primary)
+                }
             }
 
             Text(label)
