@@ -77,15 +77,13 @@ struct AtmosphericBlobShape: Shape {
 // MARK: - Animated Atmospheric Blob
 
 /// Vista de blob atmosférico con animación de "respiración"
-/// Optimizado para mejor rendimiento con opciones configurables
+/// Optimizado para mejor rendimiento - Sin partículas flotantes
 struct AnimatedAtmosphericBlob: View {
     let zone: AirQualityZone
-    let showParticles: Bool
     let enableRotation: Bool
 
     @State private var breathingPhase: Double = 0
     @State private var rotationAngle: Double = 0
-    @State private var particles: [FloatingParticle] = []
 
     var body: some View {
         ZStack {
@@ -137,19 +135,7 @@ struct AnimatedAtmosphericBlob: View {
                     )
                 )
 
-            // Capa 4: Partículas flotantes (solo para zonas contaminadas)
-            if showParticles && shouldShowParticles {
-                ForEach(particles) { particle in
-                    Circle()
-                        .fill(zone.color.opacity(0.6))
-                        .frame(width: particle.size, height: particle.size)
-                        .blur(radius: particle.size / 2)
-                        .offset(x: particle.position.x, y: particle.position.y)
-                        .opacity(particle.opacity)
-                }
-            }
-
-            // Capa 5: Icono central (solo para zonas malas)
+            // Capa 4: Icono central (solo para zonas malas)
             if shouldShowIcon {
                 ZStack {
                     Circle()
@@ -170,9 +156,6 @@ struct AnimatedAtmosphericBlob: View {
             if enableRotation {
                 startRotationAnimation()
             }
-            if showParticles && shouldShowParticles {
-                generateParticles()
-            }
         }
         .onChange(of: enableRotation) { _, newValue in
             if newValue {
@@ -181,20 +164,9 @@ struct AnimatedAtmosphericBlob: View {
                 rotationAngle = 0
             }
         }
-        .onChange(of: showParticles) { _, newValue in
-            if newValue && shouldShowParticles {
-                generateParticles()
-            } else {
-                particles.removeAll()
-            }
-        }
     }
 
     // MARK: - Computed Properties
-
-    private var shouldShowParticles: Bool {
-        zone.level == .poor || zone.level == .unhealthy || zone.level == .severe || zone.level == .hazardous
-    }
 
     private var shouldShowIcon: Bool {
         zone.level == .unhealthy || zone.level == .severe || zone.level == .hazardous
@@ -221,63 +193,6 @@ struct AnimatedAtmosphericBlob: View {
             rotationAngle = 360
         }
     }
-
-    private func generateParticles() {
-        let particleCount = particleCountForLevel
-        particles = (0..<particleCount).map { _ in
-            FloatingParticle(
-                position: randomPosition(),
-                size: Double.random(in: 2...6),
-                opacity: Double.random(in: 0.3...0.7)
-            )
-        }
-
-        animateParticles()
-    }
-
-    private func animateParticles() {
-        for i in 0..<particles.count {
-            withAnimation(
-                .linear(duration: Double.random(in: 3...8))
-                .repeatForever(autoreverses: false)
-            ) {
-                particles[i].position = randomPosition()
-            }
-
-            withAnimation(
-                .easeInOut(duration: Double.random(in: 2...4))
-                .repeatForever(autoreverses: true)
-            ) {
-                particles[i].opacity = Double.random(in: 0.2...0.8)
-            }
-        }
-    }
-
-    private var particleCountForLevel: Int {
-        switch zone.level {
-        case .good, .moderate: return 0
-        case .poor: return 8
-        case .unhealthy: return 15
-        case .severe: return 25
-        case .hazardous: return 40
-        }
-    }
-
-    private func randomPosition() -> CGPoint {
-        CGPoint(
-            x: Double.random(in: -30...30),
-            y: Double.random(in: -30...30)
-        )
-    }
-}
-
-// MARK: - Floating Particle Model
-
-struct FloatingParticle: Identifiable {
-    let id = UUID()
-    var position: CGPoint
-    var size: Double
-    var opacity: Double
 }
 
 // MARK: - Enhanced Cloud Overlay (Reemplazo de MapCircle)
@@ -298,7 +213,6 @@ struct EnhancedAirQualityOverlay: View {
     var body: some View {
         AnimatedAtmosphericBlob(
             zone: zone,
-            showParticles: appSettings.enableAirQualityParticles,
             enableRotation: appSettings.enableAirQualityRotation
         )
         .id(settingsKey) // Forzar recreación cuando cambien settings
@@ -345,7 +259,6 @@ struct EnhancedAirQualityOverlay: View {
                             pm25: 15
                         )
                     ),
-                    showParticles: false,
                     enableRotation: true
                 )
 
@@ -359,7 +272,6 @@ struct EnhancedAirQualityOverlay: View {
                             pm25: 55
                         )
                     ),
-                    showParticles: true,
                     enableRotation: true
                 )
 
@@ -373,7 +285,6 @@ struct EnhancedAirQualityOverlay: View {
                             pm25: 85
                         )
                     ),
-                    showParticles: true,
                     enableRotation: false
                 )
             }

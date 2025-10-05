@@ -563,7 +563,7 @@ struct EnhancedMapView: View {
                                 zone: zone,
                                 isVisible: showAirQualityLayer,
                                 index: index,
-                                settingsKey: "\(appSettings.enableAirQualityParticles)-\(appSettings.enableAirQualityRotation)"
+                                settingsKey: "\(appSettings.enableAirQualityRotation)"
                             )
                             .environmentObject(appSettings)
                             .onTapGesture {

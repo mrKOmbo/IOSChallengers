@@ -18,18 +18,8 @@ class AppSettings: ObservableObject {
 
     // MARK: - Air Quality Performance Settings
 
-    /// Habilita/deshabilita partículas flotantes en zonas de calidad del aire
-    /// - Impacto en rendimiento: ALTO (hasta 450 animaciones)
-    /// - Default: false (desactivado para mejor performance)
-    @AppStorage("enableAirQualityParticles")
-    var enableAirQualityParticles: Bool = false {
-        willSet {
-            objectWillChange.send()
-        }
-    }
-
     /// Habilita/deshabilita rotación de blobs atmosféricos
-    /// - Impacto en rendimiento: MEDIO (25 animaciones continuas)
+    /// - Impacto en rendimiento: BAJO (25 animaciones continuas)
     /// - Default: true (activado por defecto, efecto sutil)
     @AppStorage("enableAirQualityRotation")
     var enableAirQualityRotation: Bool = true {
@@ -66,7 +56,6 @@ class AppSettings: ObservableObject {
 
     /// Resetear todas las configuraciones a valores por defecto
     func resetToDefaults() {
-        enableAirQualityParticles = false
         enableAirQualityRotation = true
         airQualityGridSize = 5
         useMetricUnits = true
@@ -85,17 +74,14 @@ class AppSettings: ObservableObject {
     func applyPerformancePreset(_ preset: PerformancePreset) {
         switch preset {
         case .maximum:
-            enableAirQualityParticles = true
             enableAirQualityRotation = true
             airQualityGridSize = 7
 
         case .balanced:
-            enableAirQualityParticles = false
             enableAirQualityRotation = true
             airQualityGridSize = 5
 
         case .minimal:
-            enableAirQualityParticles = false
             enableAirQualityRotation = false
             airQualityGridSize = 5
         }
@@ -121,7 +107,7 @@ class AppSettings: ObservableObject {
 
     /// Indicador de si las configuraciones están en modo "alto rendimiento"
     var isHighPerformanceMode: Bool {
-        return !enableAirQualityParticles && airQualityGridSize <= 5
+        return airQualityGridSize <= 5
     }
 
     /// Número total aproximado de zonas en el grid
@@ -133,9 +119,8 @@ class AppSettings: ObservableObject {
     var estimatedActiveAnimations: Int {
         let baseAnimationsPerZone = 2 // breathing + scale
         let rotationAnimationsPerZone = enableAirQualityRotation ? 1 : 0
-        let particleAnimationsPerZone = enableAirQualityParticles ? 12 : 0 // promedio
 
-        let animationsPerZone = baseAnimationsPerZone + rotationAnimationsPerZone + particleAnimationsPerZone
+        let animationsPerZone = baseAnimationsPerZone + rotationAnimationsPerZone
         return totalAirQualityZones * animationsPerZone
     }
 }
@@ -146,7 +131,6 @@ extension AppSettings {
     /// Instancia mock para previews de SwiftUI
     static var preview: AppSettings {
         let settings = AppSettings.shared
-        settings.enableAirQualityParticles = true
         settings.enableAirQualityRotation = true
         return settings
     }

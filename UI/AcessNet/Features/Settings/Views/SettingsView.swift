@@ -109,16 +109,6 @@ struct SettingsView: View {
                             .padding(.bottom, 16)
 
                         SettingsToggleRow(
-                            title: "Floating Particles",
-                            subtitle: "Animated particles on air quality zones. Disable to improve performance.",
-                            isOn: $appSettings.enableAirQualityParticles
-                        )
-
-                        Divider()
-                            .background(Color.white.opacity(0.1))
-                            .padding(.leading, 16)
-
-                        SettingsToggleRow(
                             title: "Blob Rotation",
                             subtitle: "Subtle rotation animation on air quality zones. Disable for smoother performance.",
                             isOn: $appSettings.enableAirQualityRotation
