@@ -10,6 +10,8 @@ import SwiftUI
 struct AQIHomeView: View {
     @State private var airQualityData: AirQualityData = .sample
     @State private var selectedForecastTab: ForecastTab = .hourly
+    @State private var showSearchModal = false
+    @State private var searchText = ""
 
     enum ForecastTab {
         case hourly
@@ -54,14 +56,8 @@ struct AQIHomeView: View {
                         // Header
                         headerView
 
-                        // AQI Card
-                        aqiCard
-
-                        // Daily Forecast Quick Access Button
-                        dailyForecastButton
-
-                        // PM Indicators
-                        pmIndicators
+                        // AQI Info Button (combines AQI Card + PM Indicators)
+                        aqiInfoButton
 
                         // Weather Info Card
                         weatherCard
@@ -74,7 +70,7 @@ struct AQIHomeView: View {
 
                         Spacer(minLength: 100)
                     }
-                    .padding(.top, 60)
+                    .padding(.top, 20)
                 }
 
 
@@ -157,35 +153,29 @@ struct AQIHomeView: View {
 
                 Spacer()
 
-                // Navigation buttons
-                HStack(spacing: 12) {
-                    NavigationLink(destination: ContentView()) {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(.blue)
-                                    .shadow(color: .blue.opacity(0.5), radius: 8, x: 0, y: 4)
-                            )
-                    }
-
-                    Button(action: {}) {
-                        Image(systemName: "heart.fill")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(.blue)
-                                    .shadow(color: .blue.opacity(0.5), radius: 8, x: 0, y: 4)
-                            )
-                    }
+                // Search button
+                Button(action: {
+                    showSearchModal = true
+                }) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(.white.opacity(0.2))
+                                .overlay(
+                                    Circle()
+                                        .stroke(.white.opacity(0.3), lineWidth: 1)
+                                )
+                        )
                 }
             }
         }
         .padding(.horizontal)
+        .sheet(isPresented: $showSearchModal) {
+            LocationSearchModal(searchText: $searchText)
+        }
     }
 
     private var aqiCard: some View {
@@ -223,12 +213,12 @@ struct AQIHomeView: View {
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 18)
-                                .fill(Color.black.opacity(0.25))
+                                .fill(Color(hex: airQualityData.qualityLevel.color).opacity(0.8))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18)
-                                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                                        .stroke(.white.opacity(0.3), lineWidth: 1.5)
                                 )
-                                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                         )
                 }
             }
@@ -279,10 +269,114 @@ struct AQIHomeView: View {
         .padding(.horizontal)
     }
 
+    private var aqiInfoButton: some View {
+        NavigationLink(destination: DailyForecastView()) {
+            VStack(spacing: 16) {
+                // AQI Card content
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 10, height: 10)
+                                .shadow(color: .red, radius: 4)
+
+                            Text("Live AQI")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                        }
+
+                        Text("\(airQualityData.aqi)")
+                            .font(.system(size: 90, weight: .heavy))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 10) {
+                        Text("Air Quality is")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.95))
+
+                        Text(airQualityData.qualityLevel.rawValue)
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .fill(Color(hex: airQualityData.qualityLevel.color).opacity(0.8))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18)
+                                            .stroke(.white.opacity(0.3), lineWidth: 1.5)
+                                    )
+                                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                            )
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+
+                // PM Indicators
+                HStack(spacing: 24) {
+                    // PM2.5 - Simplified
+                    HStack(spacing: 8) {
+                        Text("PM2.5:")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.9))
+                        Text("\(Int(airQualityData.pm25)) μg/m³")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                    }
+
+                    // PM10 - Simplified
+                    HStack(spacing: 8) {
+                        Text("PM10:")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.9))
+                        Text("\(Int(airQualityData.pm10)) μg/m³")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.ultraThinMaterial.opacity(0.3))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            )
+        }
+        .padding(.horizontal)
+    }
+
     private var pmIndicators: some View {
-        HStack(spacing: 16) {
-            PMIndicator(title: "PM2.5", value: airQualityData.pm25, unit: "μg/m³")
-            PMIndicator(title: "PM10", value: airQualityData.pm10, unit: "μg/m³")
+        HStack(spacing: 24) {
+            // PM2.5 - Simplified
+            HStack(spacing: 8) {
+                Text("PM2.5:")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
+                Text("\(Int(airQualityData.pm25)) μg/m³")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+            }
+
+            // PM10 - Simplified
+            HStack(spacing: 8) {
+                Text("PM10:")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.9))
+                Text("\(Int(airQualityData.pm10)) μg/m³")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+            }
         }
         .padding(.horizontal)
     }
@@ -675,6 +769,195 @@ extension Color {
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+}
+
+// MARK: - Location Search Modal
+
+struct LocationSearchModal: View {
+    @Binding var searchText: String
+    @Environment(\.dismiss) var dismiss
+    @State private var searchResults: [String] = []
+
+    let quickLocations = [
+        ("Mexico City, Mexico", "mappin.circle.fill"),
+        ("New York, USA", "building.2.fill"),
+        ("Tokyo, Japan", "building.fill"),
+        ("London, UK", "building.columns.fill"),
+        ("Paris, France", "sparkles")
+    ]
+
+    var body: some View {
+        ZStack {
+            Color("Body")
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Header with close button
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                .padding()
+                .padding(.top, 10)
+
+                // Enhanced Search bar
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.title3)
+                        .foregroundColor(.white.opacity(0.8))
+
+                    TextField("Search location...", text: $searchText)
+                        .font(.body)
+                        .foregroundColor(.white)
+                        .autocorrectionDisabled()
+
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(.ultraThinMaterial.opacity(0.4))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(.white.opacity(0.3), lineWidth: 1.5)
+                        )
+                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
+
+                // Results or Quick Navigation
+                ScrollView {
+                    if searchText.isEmpty {
+                        VStack(alignment: .leading, spacing: 20) {
+                            // Quick Navigation Header
+                            Text("Quick Navigation")
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 20)
+
+                            // Quick location buttons
+                            VStack(spacing: 12) {
+                                ForEach(quickLocations, id: \.0) { location in
+                                    Button(action: {
+                                        dismiss()
+                                    }) {
+                                        HStack(spacing: 16) {
+                                            Image(systemName: location.1)
+                                                .font(.title2)
+                                                .foregroundColor(.white)
+                                                .frame(width: 40)
+
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(location.0)
+                                                    .font(.body.bold())
+                                                    .foregroundColor(.white)
+
+                                                Text("View air quality")
+                                                    .font(.caption)
+                                                    .foregroundColor(.white.opacity(0.7))
+                                            }
+
+                                            Spacer()
+
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.white.opacity(0.5))
+                                        }
+                                        .padding()
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .fill(.white.opacity(0.15))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(filteredLocations, id: \.self) { location in
+                                Button(action: {
+                                    dismiss()
+                                }) {
+                                    HStack(spacing: 16) {
+                                        Image(systemName: "mappin.circle.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.white)
+                                            .frame(width: 40)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(location)
+                                                .font(.body.bold())
+                                                .foregroundColor(.white)
+
+                                            Text("Tap to view air quality")
+                                                .font(.caption)
+                                                .foregroundColor(.white.opacity(0.7))
+                                        }
+
+                                        Spacer()
+
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.white.opacity(0.5))
+                                    }
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.white.opacity(0.15))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(.white.opacity(0.2), lineWidth: 1)
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                    }
+                }
+            }
+        }
+    }
+
+    var filteredLocations: [String] {
+        let sampleLocations = [
+            "Mexico City, Mexico",
+            "New York, USA",
+            "Los Angeles, USA",
+            "London, UK",
+            "Tokyo, Japan",
+            "Paris, France",
+            "Berlin, Germany",
+            "Madrid, Spain"
+        ]
+
+        if searchText.isEmpty {
+            return sampleLocations
+        } else {
+            return sampleLocations.filter { $0.lowercased().contains(searchText.lowercased()) }
+        }
     }
 }
 
