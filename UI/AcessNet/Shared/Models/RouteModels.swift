@@ -19,7 +19,11 @@ enum RoutePreference {
     case cleanestAir                                      // Mejor calidad del aire (100% aire)
     case balanced                                         // Balanceado (50% tiempo + 50% aire)
     case healthOptimized                                  // Optimizado para salud (30% tiempo + 70% aire)
+    case safest                                          // Ruta más segura (evitar incidentes)
+    case avoidIncidents                                   // Evitar áreas con incidentes activos
+    case balancedSafety                                   // Balanceado con seguridad (33% cada uno)
     case customWeighted(timeWeight: Double, airQualityWeight: Double)  // Pesos personalizados
+    case customWeightedSafety(timeWeight: Double, airQualityWeight: Double, safetyWeight: Double)  // Pesos personalizados con seguridad
 
     var transportType: MKDirectionsTransportType {
         return .automobile
@@ -32,9 +36,21 @@ enum RoutePreference {
     /// Indica si esta preferencia requiere datos de calidad del aire
     var requiresAirQualityData: Bool {
         switch self {
-        case .fastest, .shortest, .avoidHighways:
+        case .fastest, .shortest, .avoidHighways, .safest, .avoidIncidents:
             return false
-        case .cleanestAir, .balanced, .healthOptimized, .customWeighted:
+        case .cleanestAir, .balanced, .healthOptimized, .customWeighted, .balancedSafety, .customWeightedSafety:
+            return true
+        }
+    }
+
+    /// Indica si esta preferencia requiere datos de incidentes
+    var requiresIncidentData: Bool {
+        switch self {
+        case .fastest, .shortest, .avoidHighways, .cleanestAir:
+            return false
+        case .balanced, .healthOptimized, .customWeighted:
+            return false
+        case .safest, .avoidIncidents, .balancedSafety, .customWeightedSafety:
             return true
         }
     }

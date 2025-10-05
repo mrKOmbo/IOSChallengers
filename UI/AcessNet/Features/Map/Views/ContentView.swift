@@ -69,8 +69,12 @@ struct EnhancedMapView: View {
 
     // MARK: - Routing State
     @StateObject private var routeManager = RouteManager()
+    @StateObject private var routePreferences = RoutePreferencesModel()
+    @StateObject private var routeAnimations = RouteAnimationController()
     @State private var routingMode: Bool = false
     @State private var destination: DestinationPoint?
+    @State private var showRoutePreferences: Bool = false
+    @State private var selectedRouteIndex: Int? = nil
 
     // MARK: - Location Info State
     @State private var showLocationInfo: Bool = false
@@ -192,6 +196,31 @@ struct EnhancedMapView: View {
                 Spacer()
             }
 
+            // Route Preference Selector (sheet modal)
+            if showRoutePreferences {
+                RoutePreferenceSelector(
+                    isPresented: $showRoutePreferences,
+                    preferences: routePreferences,
+                    onApply: {
+                        // Aplicar nuevas preferencias
+                        applyRoutePreferences()
+
+                        // Recalcular rutas con nuevas preferencias
+                        if let destination = destination {
+                            guard let userLocation = locationManager.userLocation else { return }
+
+                            // Actualizar zonas de calidad del aire en RouteManager
+                            routeManager.updateAirQualityZones(airQualityGridManager.zones)
+
+                            // Recalcular
+                            routeManager.calculateRoute(from: userLocation, to: destination.coordinate)
+                        }
+                    }
+                )
+                .transition(.move(edge: .bottom))
+                .zIndex(100)
+            }
+
             // Location Info Card (cuando se hace long press)
             if !isSearchFocused && showLocationInfo, let locationInfo = selectedLocationInfo {
                 VStack {
@@ -208,7 +237,14 @@ struct EnhancedMapView: View {
                                 showLocationInfo = false
                             }
 
-                            // Calcular ruta
+                            // Actualizar datos en el RouteManager
+                            routeManager.updateActiveIncidents(annotations)
+                            routeManager.updateAirQualityZones(airQualityGridManager.zones)
+
+                            // Aplicar preferencias
+                            applyRoutePreferences()
+
+                            // Calcular ruta considerando todos los factores
                             routeManager.calculateRoute(from: userLocation, to: locationInfo.coordinate)
 
                             // Hacer zoom para mostrar toda la ruta después de calcularla
@@ -240,13 +276,28 @@ struct EnhancedMapView: View {
                     Spacer()
 
                     // Contenido de ruta
-                    VStack(spacing: 0) {
-                        if routeManager.isCalculating {
+                    VStack(spacing: 12) {
+                        // Selector de rutas múltiples
+                        if !routeManager.allScoredRoutes.isEmpty {
+                            RouteCardsSelector(
+                                routes: routeManager.allScoredRoutes,
+                                selectedIndex: $selectedRouteIndex,
+                                onSelectRoute: { index in
+                                    routeManager.selectRoute(at: index)
+
+                                    // Haptic feedback
+                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                    impact.impactOccurred()
+                                }
+                            )
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        } else if routeManager.isCalculating {
                             CalculatingRouteView()
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                         } else if let routeInfo = routeManager.currentRoute {
                             RouteInfoCard(
                                 routeInfo: routeInfo,
+                                scoredRoute: routeManager.currentScoredRoute,
                                 isCalculating: routeManager.isCalculating,
                                 onClear: clearRoute,
                                 onStartNavigation: nil // Opcional: implementar navegación
@@ -424,9 +475,15 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // 🎨 ROUTE ANIMATION - Optimizada (3 capas elegantes)
-                if let routeInfo = routeManager.currentRoute {
-
+                // 🎨 MÚLTIPLES RUTAS OPTIMIZADAS
+                if !routeManager.allScoredRoutes.isEmpty {
+                    MultiRouteOverlay(
+                        scoredRoutes: routeManager.allScoredRoutes,
+                        selectedIndex: selectedRouteIndex,
+                        animationPhase: dashPhase
+                    )
+                } else if let routeInfo = routeManager.currentRoute {
+                    // Fallback: ruta única (modo legacy)
                     // CAPA 1: Base de ruta con gradiente suave
                     MapPolyline(routeInfo.polyline)
                         .stroke(
@@ -566,6 +623,17 @@ struct EnhancedMapView: View {
                     isPrimary: showAirQualityLayer
                 ) {
                     toggleAirQualityLayer()
+                }
+
+                // Route Preferences button (solo si hay ruta activa)
+                if routeManager.currentRoute != nil {
+                    FloatingActionButton(
+                        icon: "slider.horizontal.3",
+                        color: .orange,
+                        size: 50
+                    ) {
+                        showRoutePreferences = true
+                    }
                 }
             }
             .padding(.leading, 20)
@@ -726,7 +794,14 @@ struct EnhancedMapView: View {
                 return
             }
 
-            // Calcular ruta
+            // Actualizar datos en el RouteManager
+            routeManager.updateActiveIncidents(annotations)
+            routeManager.updateAirQualityZones(airQualityGridManager.zones)
+
+            // Aplicar preferencias
+            applyRoutePreferences()
+
+            // Calcular ruta considerando todos los factores
             routeManager.calculateRoute(from: origin, to: coordinate)
 
             // Hacer zoom para mostrar toda la ruta después de calcularla con delay mayor
@@ -740,7 +815,27 @@ struct EnhancedMapView: View {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             destination = nil
             routeManager.clearRoute()
+            selectedRouteIndex = nil
         }
+    }
+
+    private func applyRoutePreferences() {
+        // Determinar la preferencia basada en los pesos
+        let preference: RoutePreference
+
+        if routePreferences.speedWeight > 0.6 {
+            preference = .fastest
+        } else if routePreferences.safetyWeight > 0.5 {
+            preference = .safest
+        } else if routePreferences.airQualityWeight > 0.5 {
+            preference = .cleanestAir
+        } else if routePreferences.safetyWeight > 0.3 && routePreferences.airQualityWeight > 0.3 {
+            preference = .balancedSafety
+        } else {
+            preference = .balanced
+        }
+
+        routeManager.setPreference(preference)
     }
 
     private func zoomToRoute() {

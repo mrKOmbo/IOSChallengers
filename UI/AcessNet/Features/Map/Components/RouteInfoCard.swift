@@ -12,6 +12,7 @@ import MapKit
 
 struct RouteInfoCard: View {
     let routeInfo: RouteInfo
+    let scoredRoute: ScoredRoute?  // Opcional para mostrar datos avanzados
     let isCalculating: Bool
     let onClear: () -> Void
     let onStartNavigation: (() -> Void)?
@@ -109,6 +110,51 @@ struct RouteInfoCard: View {
             }
             .padding(.vertical, 8)
 
+            // Información de seguridad (si está disponible)
+            if let scored = scoredRoute, let incidentAnalysis = scored.incidentAnalysis {
+                VStack(spacing: 12) {
+                    Divider()
+
+                    HStack(spacing: 16) {
+                        // Safety Score Badge
+                        EnhancedInfoBadge(
+                            icon: incidentAnalysis.riskIcon,
+                            value: "\(Int(incidentAnalysis.safetyScore))%",
+                            label: "Safety",
+                            color: riskLevelColor(incidentAnalysis.riskLevel)
+                        )
+
+                        if incidentAnalysis.totalIncidents > 0 {
+                            Divider()
+                                .frame(height: 35)
+
+                            // Incidents Badge
+                            EnhancedInfoBadge(
+                                icon: "exclamationmark.triangle.fill",
+                                value: "\(incidentAnalysis.totalIncidents)",
+                                label: "Incidents",
+                                color: .orange
+                            )
+                        }
+                    }
+
+                    // Risk Level Description
+                    if incidentAnalysis.totalIncidents > 0 {
+                        Text(incidentAnalysis.incidentSummary)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.orange.opacity(0.1))
+                            )
+                    }
+                }
+            }
+
             // Botones de acción (mejorados)
             HStack(spacing: 12) {
                 // Botón Start Navigation (opcional)
@@ -164,6 +210,19 @@ struct RouteInfoCard: View {
                     )
                 }
             }
+        }
+    }
+
+    // MARK: - Helper Functions
+
+    /// Determina el color según el nivel de riesgo
+    private func riskLevelColor(_ riskLevel: RiskLevel) -> Color {
+        switch riskLevel {
+        case .veryLow: return .green
+        case .low: return .mint
+        case .moderate: return .yellow
+        case .high: return .orange
+        case .veryHigh: return .red
         }
     }
 }
@@ -633,6 +692,7 @@ struct EnhancedRouteInfoCard: View {
 
         RouteInfoCard(
             routeInfo: routeInfo,
+            scoredRoute: nil,  // Sin datos avanzados en el preview
             isCalculating: false,
             onClear: { print("Clear tapped") },
             onStartNavigation: { print("Start navigation") }

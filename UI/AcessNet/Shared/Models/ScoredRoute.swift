@@ -10,15 +10,17 @@ import MapKit
 
 // MARK: - Scored Route
 
-/// Ruta con análisis de tiempo y calidad del aire combinados
+/// Ruta con análisis de tiempo, calidad del aire e incidentes combinados
 struct ScoredRoute: Identifiable {
     let id: UUID
     let routeInfo: RouteInfo
     let airQualityAnalysis: AirQualityRouteAnalysis?
+    let incidentAnalysis: IncidentRouteAnalysis?
 
     // Scores normalizados (0-100)
     let timeScore: Double          // 100 = más rápido
     let airQualityScore: Double    // 100 = mejor aire
+    let safetyScore: Double        // 100 = más seguro (menos incidentes)
     let combinedScore: Double      // Score final ponderado
 
     // Metadata
@@ -29,14 +31,17 @@ struct ScoredRoute: Identifiable {
         id: UUID = UUID(),
         routeInfo: RouteInfo,
         airQualityAnalysis: AirQualityRouteAnalysis? = nil,
+        incidentAnalysis: IncidentRouteAnalysis? = nil,
         fastestTime: TimeInterval,
         cleanestAQI: Double,
+        safestSafetyScore: Double = 100.0,
         preference: RoutePreference,
         rankPosition: Int? = nil
     ) {
         self.id = id
         self.routeInfo = routeInfo
         self.airQualityAnalysis = airQualityAnalysis
+        self.incidentAnalysis = incidentAnalysis
         self.preference = preference
         self.rankPosition = rankPosition
 
@@ -57,10 +62,19 @@ struct ScoredRoute: Identifiable {
             self.airQualityScore = 50.0
         }
 
+        // Calcular score de seguridad (normalizado)
+        if let analysis = incidentAnalysis {
+            self.safetyScore = analysis.safetyScore
+        } else {
+            // Si no hay datos de incidentes, asumir ruta segura (85)
+            self.safetyScore = 85.0
+        }
+
         // Calcular score combinado según preferencia
-        self.combinedScore = RouteScoring.calculateCombinedScore(
+        self.combinedScore = RouteScoring.calculateCombinedScoreWithSafety(
             timeScore: self.timeScore,
             airQualityScore: self.airQualityScore,
+            safetyScore: self.safetyScore,
             preference: preference
         )
     }
@@ -127,7 +141,23 @@ struct ScoredRoute: Identifiable {
             parts.append("AQI \(Int(analysis.averageAQI))")
         }
 
+        if let incidents = incidentAnalysis {
+            if incidents.totalIncidents > 0 {
+                parts.append("\(incidents.totalIncidents) incident\(incidents.totalIncidents > 1 ? "s" : "")")
+            }
+        }
+
         return parts.joined(separator: " • ")
+    }
+
+    /// Nivel de riesgo de la ruta
+    var riskLevel: RiskLevel? {
+        return incidentAnalysis?.riskLevel
+    }
+
+    /// Resumen de incidentes
+    var incidentSummary: String? {
+        return incidentAnalysis?.incidentSummary
     }
 }
 
@@ -190,6 +220,28 @@ struct RouteScoring {
         let (timeWeight, airWeight) = preference.weights
 
         let combined = (timeWeight * timeScore) + (airWeight * airQualityScore)
+
+        return max(0, min(100, combined))
+    }
+
+    /// Calcula el score combinado con seguridad según la preferencia del usuario
+    /// - Parameters:
+    ///   - timeScore: Score de tiempo (0-100)
+    ///   - airQualityScore: Score de calidad del aire (0-100)
+    ///   - safetyScore: Score de seguridad (0-100)
+    ///   - preference: Preferencia de ruteo
+    /// - Returns: Score combinado ponderado (0-100)
+    static func calculateCombinedScoreWithSafety(
+        timeScore: Double,
+        airQualityScore: Double,
+        safetyScore: Double,
+        preference: RoutePreference
+    ) -> Double {
+        let weights = preference.weightsWithSafety
+
+        let combined = (weights.timeWeight * timeScore) +
+                      (weights.airQualityWeight * airQualityScore) +
+                      (weights.safetyWeight * safetyScore)
 
         return max(0, min(100, combined))
     }
@@ -289,11 +341,68 @@ extension RoutePreference {
         case .healthOptimized:
             return (0.3, 0.7)  // 30% tiempo, 70% aire
 
+        case .safest:
+            return (0.2, 0.0)  // 20% tiempo, 0% aire (80% safety implícito)
+
+        case .avoidIncidents:
+            return (0.3, 0.0)  // 30% tiempo, 0% aire (70% safety implícito)
+
+        case .balancedSafety:
+            return (0.33, 0.33)  // 33% tiempo, 33% aire (34% safety implícito)
+
         case .customWeighted(let timeWeight, let airWeight):
             // Normalizar para que sumen 1.0
             let total = timeWeight + airWeight
             guard total > 0 else { return (0.5, 0.5) }
             return (timeWeight / total, airWeight / total)
+
+        case .customWeightedSafety:
+            return (0.33, 0.33)  // Por defecto balanceado
+        }
+    }
+
+    /// Pesos para scoring combinado con seguridad (timeWeight, airQualityWeight, safetyWeight)
+    /// Los pesos suman 1.0 (100%)
+    var weightsWithSafety: (timeWeight: Double, airQualityWeight: Double, safetyWeight: Double) {
+        switch self {
+        case .fastest:
+            return (1.0, 0.0, 0.0)  // 100% tiempo
+
+        case .shortest:
+            return (1.0, 0.0, 0.0)  // 100% distancia (usa tiempo como proxy)
+
+        case .avoidHighways:
+            return (0.8, 0.0, 0.2)  // 80% tiempo, 20% safety (evitar autopistas puede ser más seguro)
+
+        case .cleanestAir:
+            return (0.0, 1.0, 0.0)  // 100% aire
+
+        case .balanced:
+            return (0.4, 0.4, 0.2)  // 40% tiempo, 40% aire, 20% safety
+
+        case .healthOptimized:
+            return (0.2, 0.5, 0.3)  // 20% tiempo, 50% aire, 30% safety
+
+        case .safest:
+            return (0.2, 0.0, 0.8)  // 20% tiempo, 80% safety
+
+        case .avoidIncidents:
+            return (0.3, 0.0, 0.7)  // 30% tiempo, 70% safety
+
+        case .balancedSafety:
+            return (0.33, 0.33, 0.34)  // 33% cada uno
+
+        case .customWeighted(let timeWeight, let airWeight):
+            // Añadir un peso de seguridad mínimo
+            let safetyWeight = 0.1
+            let total = timeWeight + airWeight + safetyWeight
+            return (timeWeight / total, airWeight / total, safetyWeight / total)
+
+        case .customWeightedSafety(let timeWeight, let airWeight, let safetyWeight):
+            // Normalizar para que sumen 1.0
+            let total = timeWeight + airWeight + safetyWeight
+            guard total > 0 else { return (0.33, 0.33, 0.34) }
+            return (timeWeight / total, airWeight / total, safetyWeight / total)
         }
     }
 
@@ -306,8 +415,13 @@ extension RoutePreference {
         case .cleanestAir: return "Cleanest Air"
         case .balanced: return "Balanced (Time + Air)"
         case .healthOptimized: return "Health Optimized"
+        case .safest: return "Safest Route"
+        case .avoidIncidents: return "Avoid Incidents"
+        case .balancedSafety: return "Balanced with Safety"
         case .customWeighted(let timeWeight, let airWeight):
             return "Custom (\(Int(timeWeight * 100))% time, \(Int(airWeight * 100))% air)"
+        case .customWeightedSafety(let timeWeight, let airWeight, let safetyWeight):
+            return "Custom (\(Int(timeWeight * 100))% time, \(Int(airWeight * 100))% air, \(Int(safetyWeight * 100))% safety)"
         }
     }
 
@@ -320,7 +434,11 @@ extension RoutePreference {
         case .cleanestAir: return "leaf.fill"
         case .balanced: return "scale.3d"
         case .healthOptimized: return "heart.circle.fill"
+        case .safest: return "shield.fill"
+        case .avoidIncidents: return "exclamationmark.shield"
+        case .balancedSafety: return "shield.checkered"
         case .customWeighted: return "slider.horizontal.3"
+        case .customWeightedSafety: return "slider.horizontal.below.square.fill.and.square"
         }
     }
 }
