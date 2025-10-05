@@ -24,28 +24,29 @@ struct RouteSegmentMarker: View {
             .fill(
                 AngularGradient(
                     gradient: Gradient(colors: [
-                        .cyan.opacity(0.8),
-                        .blue,
-                        .blue.opacity(0.6),
-                        .cyan.opacity(0.8)
+                        Color(red: 0, green: 1, blue: 1).opacity(0.9), // Cyan brillante
+                        Color(red: 0.04, green: 0.52, blue: 1.0), // Azul iOS
+                        Color(red: 0, green: 0.5, blue: 1).opacity(0.7),
+                        Color(red: 0, green: 1, blue: 1).opacity(0.9)
                     ]),
                     center: .center,
                     startAngle: .degrees(animationPhase),
                     endAngle: .degrees(animationPhase + 360)
                 )
             )
-            .frame(width: 8, height: 8)
-            .shadow(color: .blue.opacity(0.6), radius: 4, x: 0, y: 2)
+            .frame(width: 14, height: 14) // Más grande
+            .shadow(color: .cyan.opacity(0.8), radius: 6, x: 0, y: 2)
+            .shadow(color: .blue.opacity(0.6), radius: 3, x: 0, y: 1) // Doble sombra
             .overlay(
                 Circle()
-                    .strokeBorder(.white.opacity(0.9), lineWidth: 1.5)
+                    .strokeBorder(.white, lineWidth: 2)
             )
             .onAppear {
                 // Delay basado en la posición en la ruta para efecto "wave"
-                let delay = Double(segmentIndex) * 0.02
+                let delay = Double(segmentIndex) * 0.015
 
                 withAnimation(
-                    .linear(duration: 2.0)
+                    .linear(duration: 1.5)
                     .repeatForever(autoreverses: false)
                     .delay(delay)
                 ) {

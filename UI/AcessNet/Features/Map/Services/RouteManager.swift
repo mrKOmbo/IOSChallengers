@@ -229,9 +229,9 @@ class RouteManager: ObservableObject {
     // MARK: - Route Segment Points (Elevated Line)
 
     /// Calcula puntos densos a lo largo de la ruta para simular línea elevada 3D
-    /// - Parameter interval: Distancia entre puntos en metros (default: 8m)
+    /// - Parameter interval: Distancia entre puntos en metros (default: 5m)
     /// - Returns: Array de puntos de segmento de ruta
-    func calculateRouteSegmentPoints(interval: CLLocationDistance = 8) -> [RouteSegmentPoint] {
+    func calculateRouteSegmentPoints(interval: CLLocationDistance = 5) -> [RouteSegmentPoint] {
         guard let route = currentRoute?.route else { return [] }
 
         let polyline = route.polyline
