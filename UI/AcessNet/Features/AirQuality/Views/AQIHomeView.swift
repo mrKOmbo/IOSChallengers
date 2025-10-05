@@ -8,15 +8,48 @@
 import SwiftUI
 
 struct AQIHomeView: View {
+    @Binding var showBusinessPulse: Bool
     @State private var airQualityData: AirQualityData = .sample
     @State private var selectedForecastTab: ForecastTab = .hourly
+    @State private var isMenuOpen = false
 
     enum ForecastTab {
         case hourly
         case daily
     }
 
+    private let menuWidth: CGFloat = 280
+
+    init(showBusinessPulse: Binding<Bool>) {
+        self._showBusinessPulse = showBusinessPulse
+    }
+
     var body: some View {
+        ZStack(alignment: .leading) {
+            // Side menu ahora vive en la vista de inicio
+            SideMenuView(onBusinessToggle: { isActive in
+                showBusinessPulse = isActive
+            })
+            .frame(width: menuWidth)
+            .offset(x: isMenuOpen ? 0 : -menuWidth)
+
+            mainContent
+                .cornerRadius(isMenuOpen ? 20 : 0)
+                .scaleEffect(isMenuOpen ? 0.82 : 1)
+                .offset(x: isMenuOpen ? menuWidth : 0)
+                .shadow(color: .black.opacity(isMenuOpen ? 0.25 : 0), radius: 10)
+                .disabled(isMenuOpen)
+                .overlay(
+                    Color.black.opacity(isMenuOpen ? 0.2 : 0)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                )
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isMenuOpen)
+        .ignoresSafeArea()
+    }
+
+    private var mainContent: some View {
         NavigationView {
             ZStack {
                 // Background gradient based on AQI level - More vibrant with multiple layers
@@ -71,10 +104,9 @@ struct AQIHomeView: View {
 
                         // Weather Forecast
                         weatherForecast
-
-                        Spacer(minLength: 100)
                     }
                     .padding(.top, 60)
+                    .avoidTabBar(extraPadding: 20)
                 }
 
 
@@ -118,19 +150,35 @@ struct AQIHomeView: View {
                             )
                         }
                         .padding(.trailing, 20)
-                        .padding(.bottom, 100)
+                        .aboveTabBar(extraPadding: 20)
                     }
                 }
             }
             .navigationBarHidden(true)
         }
+        .navigationViewStyle(.stack)
     }
 
     // MARK: - View Components
 
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 16) {
+                Button(action: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        isMenuOpen.toggle()
+                    }
+                }) {
+                    Image(systemName: isMenuOpen ? "xmark" : "line.3.horizontal")
+                        .font(.title2.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(10)
+                        .background(Color.white.opacity(0.15))
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
+                }
+                .accessibilityLabel("Abrir menú lateral")
+
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Image(systemName: "location.fill")
@@ -159,7 +207,7 @@ struct AQIHomeView: View {
 
                 // Navigation buttons
                 HStack(spacing: 12) {
-                    NavigationLink(destination: ContentView()) {
+                    NavigationLink(destination: ContentView(showBusinessPulse: $showBusinessPulse)) {
                         Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                             .font(.title3)
                             .foregroundColor(.white)
@@ -649,37 +697,8 @@ struct HourlyForecastItem: View {
     }
 }
 
-// MARK: - Color Extension
-
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
-    AQIHomeView()
+    AQIHomeView(showBusinessPulse: .constant(false))
 }

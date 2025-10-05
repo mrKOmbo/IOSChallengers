@@ -50,8 +50,8 @@ class LocationManager: NSObject, ObservableObject {
 
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10 // Actualizar cada 10 metros
-        locationManager.headingFilter = 5 // Actualizar cada 5 grados
+        locationManager.distanceFilter = 50 // Actualizar cada 50 metros (optimizado para performance)
+        locationManager.headingFilter = 10 // Actualizar cada 10 grados
 
         checkLocationAuthorization()
     }

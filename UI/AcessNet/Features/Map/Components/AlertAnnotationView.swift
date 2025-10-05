@@ -58,58 +58,26 @@ struct AlertAnnotationView: View {
     let alertType: AlertType
     let showPulse: Bool
 
-    @State private var pulseScale: CGFloat = 1.0
-    @State private var pulseOpacity: Double = 0.6
-    @State private var iconScale: CGFloat = 1.0
-    @State private var rotation: Double = 0
-
     var body: some View {
         ZStack {
-            // Efecto de pulso suave y elegante
-            if showPulse {
-                // Primer anillo de pulso
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [alertType.color, alertType.color.opacity(0.3)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 2
-                    )
-                    .scaleEffect(pulseScale)
-                    .opacity(pulseOpacity)
-                    .frame(width: 55, height: 55)
-
-                // Segundo anillo de pulso (efecto doble)
-                Circle()
-                    .stroke(
-                        alertType.color.opacity(0.4),
-                        lineWidth: 1.5
-                    )
-                    .scaleEffect(pulseScale * 1.15)
-                    .opacity(pulseOpacity * 0.7)
-                    .frame(width: 55, height: 55)
-            }
-
-            // Glow externo sutil
+            // Glow externo con gradiente (SIN BLUR - mejor performance)
             Circle()
                 .fill(
                     RadialGradient(
                         colors: [
-                            alertType.color.opacity(0.3),
+                            alertType.color.opacity(0.4),
+                            alertType.color.opacity(0.25),
                             alertType.color.opacity(0.1),
                             .clear
                         ],
                         center: .center,
-                        startRadius: 20,
+                        startRadius: 10,
                         endRadius: 35
                     )
                 )
                 .frame(width: 70, height: 70)
-                .blur(radius: 4)
 
-            // Icono principal con glassmorphism
+            // Icono principal con glassmorphism (estático)
             ZStack {
                 // Fondo con glassmorphism
                 Circle()
@@ -148,25 +116,6 @@ struct AlertAnnotationView: View {
                     .font(.system(size: 21, weight: .semibold))
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
-            }
-            .scaleEffect(iconScale)
-        }
-        .onAppear {
-            // Animación de pulso suave
-            withAnimation(
-                .easeInOut(duration: 2.0)
-                .repeatForever(autoreverses: true)
-            ) {
-                pulseScale = 1.6
-                pulseOpacity = 0.0
-            }
-
-            // Animación sutil del icono
-            withAnimation(
-                .easeInOut(duration: 1.5)
-                .repeatForever(autoreverses: true)
-            ) {
-                iconScale = 1.08
             }
         }
     }

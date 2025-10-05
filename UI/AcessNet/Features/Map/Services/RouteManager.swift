@@ -26,16 +26,34 @@ class RouteManager: ObservableObject {
     /// Rutas alternativas con scoring
     @Published var alternateScoredRoutes: [ScoredRoute] = []
 
+    /// Todas las rutas con scoring (para visualización múltiple)
+    @Published var allScoredRoutes: [ScoredRoute] = []
+
+    /// Índice de la ruta seleccionada
+    @Published var selectedRouteIndex: Int = 0
+
     /// Indica si se está calculando una ruta
     @Published var isCalculating: Bool = false
 
     /// Error en caso de fallo al calcular ruta
     @Published var errorMessage: String?
 
+    /// Progreso de optimización
+    @Published var optimizationProgress: Double = 0.0
+
     // MARK: - Private Properties
 
     private var currentTask: Task<Void, Never>?
     private var preference: RoutePreference = .balanced  // Default: balanced
+
+    /// Incidentes activos en el mapa
+    private var activeIncidents: [CustomAnnotation] = []
+
+    /// Zonas de calidad del aire
+    private var airQualityZones: [AirQualityZone] = []
+
+    /// Optimizador de rutas
+    private let routeOptimizer: RouteOptimizer
 
     /// Servicio de API de calidad del aire
     private let airQualityService: AirQualityAPIService
@@ -48,6 +66,7 @@ class RouteManager: ObservableObject {
     init(useMockService: Bool = true) {
         self.useMockService = useMockService
         self.airQualityService = useMockService ? MockAirQualityAPIService() : AirQualityAPIService.shared
+        self.routeOptimizer = RouteOptimizer()
     }
 
     // MARK: - Public Methods
@@ -55,6 +74,33 @@ class RouteManager: ObservableObject {
     /// Establece la preferencia de ruta
     func setPreference(_ preference: RoutePreference) {
         self.preference = preference
+    }
+
+    /// Actualiza los incidentes activos para considerar en el cálculo de rutas
+    func updateActiveIncidents(_ incidents: [CustomAnnotation]) {
+        self.activeIncidents = incidents
+        routeOptimizer.updateData(incidents: incidents, airQualityZones: airQualityZones)
+    }
+
+    /// Actualiza las zonas de calidad del aire
+    func updateAirQualityZones(_ zones: [AirQualityZone]) {
+        self.airQualityZones = zones
+        routeOptimizer.updateData(incidents: activeIncidents, airQualityZones: zones)
+    }
+
+    /// Selecciona una ruta específica
+    func selectRoute(at index: Int) {
+        guard index >= 0 && index < allScoredRoutes.count else { return }
+
+        selectedRouteIndex = index
+        currentScoredRoute = allScoredRoutes[index]
+        currentRoute = currentScoredRoute?.routeInfo
+
+        // Actualizar alternativas
+        var alternates = allScoredRoutes
+        alternates.remove(at: index)
+        alternateScoredRoutes = alternates
+        alternateRoutes = alternates.map { $0.routeInfo }
     }
 
     /// Calcula la ruta desde un origen hasta un destino
@@ -114,6 +160,9 @@ class RouteManager: ObservableObject {
         case .fastest, .cleanestAir, .balanced, .healthOptimized, .customWeighted:
             // Por defecto MKDirections optimiza para la ruta más rápida
             break
+        case .customWeightedSafety, .safest, .avoidIncidents, .balancedSafety:
+            // Sin configuración adicional específica para MKDirections en estos modos
+            break
         case .shortest:
             // MKDirections no tiene opción explícita para ruta más corta,
             // pero podemos filtrar las alternativas después
@@ -142,23 +191,25 @@ class RouteManager: ObservableObject {
             } else {
                 print("✅ Apple Maps retornó \(routes.count) rutas")
 
-                // Si la preferencia requiere datos de aire, hacer scoring avanzado
-                if preference.requiresAirQualityData {
-                    await performAirQualityScoring(routes: routes)
+                // Usar el RouteOptimizer para análisis avanzado
+                if preference.requiresAirQualityData || preference.requiresIncidentData || !activeIncidents.isEmpty || !airQualityZones.isEmpty {
+                    await performOptimizedScoring(routes: routes, from: origin, to: destination)
                 } else {
-                    // Modo legacy: solo ordenar por tiempo
+                    // Modo básico: solo considerar tiempo
                     let sortedRoutes = sortRoutes(routes)
                     currentRoute = sortedRoutes.first
                     alternateRoutes = Array(sortedRoutes.dropFirst())
 
-                    // También crear scored routes sin datos de aire
+                    // Crear scored routes sin datos avanzados
                     let fastestTime = routes.map { $0.expectedTravelTime }.min() ?? 0
                     let scoredRoutes = routes.map { routeInfo in
                         ScoredRoute(
                             routeInfo: routeInfo,
                             airQualityAnalysis: nil,
+                            incidentAnalysis: nil,
                             fastestTime: fastestTime,
                             cleanestAQI: 0,
+                            safestSafetyScore: 100.0,
                             preference: preference
                         )
                     }
@@ -185,56 +236,110 @@ class RouteManager: ObservableObject {
         isCalculating = false
     }
 
-    /// Realiza scoring avanzado con datos de calidad del aire
+    /// Realiza scoring optimizado usando el RouteOptimizer
     @MainActor
-    private func performAirQualityScoring(routes: [RouteInfo]) async {
-        print("🌍 Iniciando análisis de calidad del aire para \(routes.count) rutas...")
+    private func performOptimizedScoring(routes: [RouteInfo], from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async {
+        print("🚀 Iniciando optimización avanzada para \(routes.count) rutas...")
 
-        var routesWithAirQuality: [(RouteInfo, AirQualityRouteAnalysis?)] = []
+        // Actualizar progreso
+        optimizationProgress = 0.0
 
-        // Para cada ruta, analizar calidad del aire
+        // Usar el RouteOptimizer para análisis avanzado
+        let optimizedRoutes = await routeOptimizer.optimizeRoutes(
+            routes: routes,
+            from: origin,
+            to: destination
+        )
+
+        // Actualizar todas las rutas con scoring
+        allScoredRoutes = optimizedRoutes
+
+        // Seleccionar la mejor ruta
+        if let best = optimizedRoutes.first {
+            currentScoredRoute = best
+            currentRoute = best.routeInfo
+
+            // Alternativas
+            alternateScoredRoutes = Array(optimizedRoutes.dropFirst())
+            alternateRoutes = alternateScoredRoutes.map { $0.routeInfo }
+
+            // Log resultado
+            print("🏆 Mejor ruta seleccionada:")
+            print("   - \(best.routeInfo.distanceFormatted), \(best.routeInfo.timeFormatted)")
+            if let incidents = best.incidentAnalysis {
+                print("   - Safety score: \(Int(incidents.safetyScore))")
+                print("   - Incidentes: \(incidents.totalIncidents)")
+            }
+            print("   - Score combinado: \(Int(best.combinedScore))/100")
+            print("   - \(best.scoreDescription)")
+        }
+
+        optimizationProgress = 1.0
+    }
+
+    /// Realiza scoring avanzado con datos de calidad del aire e incidentes (LEGACY)
+    @MainActor
+    private func performAdvancedScoring(routes: [RouteInfo]) async {
+        print("🌍 Iniciando análisis avanzado para \(routes.count) rutas...")
+
+        var routesWithAnalysis: [(RouteInfo, AirQualityRouteAnalysis?, IncidentRouteAnalysis?)] = []
+
+        // Para cada ruta, analizar calidad del aire e incidentes
         for (index, routeInfo) in routes.enumerated() {
             print("  Analizando ruta \(index + 1)/\(routes.count)...")
 
-            do {
-                // Samplear coordenadas del polyline (cada 150m)
-                let sampledCoordinates = samplePolylineCoordinates(
-                    routeInfo.route.polyline,
-                    interval: 150
-                )
+            var airQualityAnalysis: AirQualityRouteAnalysis? = nil
+            var incidentAnalysis: IncidentRouteAnalysis? = nil
 
-                print("    - Polyline tiene \(sampledCoordinates.count) puntos muestreados")
+            // Análisis de calidad del aire (si es necesario)
+            if preference.requiresAirQualityData {
+                do {
+                    // Samplear coordenadas del polyline (cada 150m)
+                    let sampledCoordinates = samplePolylineCoordinates(
+                        routeInfo.route.polyline,
+                        interval: 150
+                    )
 
-                // Consultar backend para análisis de calidad del aire
-                let airQualityAnalysis = try await airQualityService.analyzeRoute(
-                    coordinates: sampledCoordinates,
-                    samplingInterval: 150
-                )
+                    print("    - Polyline tiene \(sampledCoordinates.count) puntos muestreados")
 
-                print("    - AQI promedio: \(Int(airQualityAnalysis.averageAQI))")
+                    // Consultar backend para análisis de calidad del aire
+                    airQualityAnalysis = try await airQualityService.analyzeRoute(
+                        coordinates: sampledCoordinates,
+                        samplingInterval: 150
+                    )
 
-                // Guardar ruta con análisis
-                routesWithAirQuality.append((routeInfo, airQualityAnalysis))
+                    print("    - AQI promedio: \(Int(airQualityAnalysis?.averageAQI ?? 0))")
 
-            } catch {
-                print("    ⚠️ Error analizando ruta: \(error.localizedDescription)")
-
-                // Si falla el análisis de aire, crear ruta sin datos de aire
-                routesWithAirQuality.append((routeInfo, nil))
+                } catch {
+                    print("    ⚠️ Error analizando calidad del aire: \(error.localizedDescription)")
+                }
             }
+
+            // Análisis de incidentes (si es necesario)
+            if preference.requiresIncidentData && !activeIncidents.isEmpty {
+                incidentAnalysis = analyzeIncidentsForRoute(routeInfo: routeInfo)
+                print("    - Incidentes encontrados: \(incidentAnalysis?.totalIncidents ?? 0)")
+                print("    - Safety score: \(Int(incidentAnalysis?.safetyScore ?? 100))")
+            }
+
+            // Guardar ruta con análisis
+            routesWithAnalysis.append((routeInfo, airQualityAnalysis, incidentAnalysis))
         }
 
         // Calcular valores mínimos para normalización
         let fastestTime = routes.map { $0.expectedTravelTime }.min() ?? 0
-        let cleanestAQI = routesWithAirQuality.compactMap { $0.1?.averageAQI }.min() ?? 50
+        let cleanestAQI = routesWithAnalysis.compactMap { $0.1?.averageAQI }.min() ?? 50
+        let safestScore = routesWithAnalysis.compactMap { $0.2?.safetyScore }.max() ?? 100
 
         // Crear ScoredRoutes con scoring normalizado
-        var finalScoredRoutes = routesWithAirQuality.enumerated().map { (index, tuple) in
+        var finalScoredRoutes = routesWithAnalysis.enumerated().map { (index, tuple) in
             ScoredRoute(
                 routeInfo: tuple.0,
                 airQualityAnalysis: tuple.1,
+                incidentAnalysis: tuple.2,
                 fastestTime: fastestTime,
                 cleanestAQI: cleanestAQI,
+                safestSafetyScore: safestScore,
                 preference: preference,
                 rankPosition: index + 1
             )
@@ -249,8 +354,10 @@ class RouteManager: ObservableObject {
                 id: finalScoredRoutes[index].id,
                 routeInfo: finalScoredRoutes[index].routeInfo,
                 airQualityAnalysis: finalScoredRoutes[index].airQualityAnalysis,
+                incidentAnalysis: finalScoredRoutes[index].incidentAnalysis,
                 fastestTime: fastestTime,
                 cleanestAQI: cleanestAQI,
+                safestSafetyScore: safestScore,
                 preference: preference,
                 rankPosition: index + 1
             )
@@ -324,15 +431,82 @@ class RouteManager: ObservableObject {
         return sampledCoordinates
     }
 
+    /// Analiza los incidentes a lo largo de una ruta
+    private func analyzeIncidentsForRoute(routeInfo: RouteInfo) -> IncidentRouteAnalysis {
+        let polyline = routeInfo.route.polyline
+        let coordinates = polyline.coordinates()
+
+        var nearbyIncidents: [(incident: CustomAnnotation, distance: Double)] = []
+        var trafficCount = 0
+        var hazardCount = 0
+        var accidentCount = 0
+        var pedestrianCount = 0
+        var policeCount = 0
+        var roadWorkCount = 0
+
+        // Para cada incidente, calcular su distancia mínima a la ruta
+        for incident in activeIncidents {
+            var minDistance = Double.greatestFiniteMagnitude
+
+            // Buscar el punto más cercano de la ruta al incidente
+            for coord in coordinates {
+                let distance = coord.distance(to: incident.coordinate)
+                minDistance = min(minDistance, distance)
+
+                // Si está muy cerca, no necesitamos seguir buscando
+                if distance < 50 {
+                    break
+                }
+            }
+
+            // Si el incidente está dentro del radio de impacto, considerarlo
+            if minDistance <= IncidentImpactCalculator.areaImpactRadius {
+                nearbyIncidents.append((incident, minDistance))
+
+                // Contar por tipo
+                switch incident.alertType {
+                case .traffic: trafficCount += 1
+                case .hazard: hazardCount += 1
+                case .accident: accidentCount += 1
+                case .pedestrian: pedestrianCount += 1
+                case .police: policeCount += 1
+                case .roadWork: roadWorkCount += 1
+                }
+            }
+        }
+
+        // Calcular safety score basado en los incidentes encontrados
+        let safetyScore = IncidentImpactCalculator.calculateRouteSafetyScore(incidents: nearbyIncidents)
+        let criticalCount = IncidentImpactCalculator.countCriticalIncidents(incidents: nearbyIncidents)
+        let riskLevel = RiskLevel.from(safetyScore: safetyScore)
+
+        return IncidentRouteAnalysis(
+            totalIncidents: nearbyIncidents.count,
+            criticalIncidents: criticalCount,
+            nearbyIncidents: nearbyIncidents,
+            safetyScore: safetyScore,
+            riskLevel: riskLevel,
+            trafficCount: trafficCount,
+            hazardCount: hazardCount,
+            accidentCount: accidentCount,
+            pedestrianCount: pedestrianCount,
+            policeCount: policeCount,
+            roadWorkCount: roadWorkCount
+        )
+    }
+
     /// Ordena las rutas según la preferencia establecida
     private func sortRoutes(_ routes: [RouteInfo]) -> [RouteInfo] {
         switch preference {
-        case .fastest, .cleanestAir, .balanced, .healthOptimized, .customWeighted:
+        case .fastest, .cleanestAir, .balanced, .healthOptimized, .customWeighted, .customWeightedSafety:
             return routes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
         case .shortest:
             return routes.sorted { $0.distanceInKm < $1.distanceInKm }
         case .avoidHighways:
             // Para evitar autopistas, preferimos la más rápida de las disponibles
+            return routes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
+        case .safest, .avoidIncidents, .balancedSafety:
+            // Para seguridad, ordenar por tiempo pero el scoring avanzado manejará la prioridad real
             return routes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
         }
     }
@@ -353,9 +527,9 @@ class RouteManager: ObservableObject {
     // MARK: - Directional Arrows
 
     /// Calcula flechas direccionales a lo largo de la ruta
-    /// - Parameter interval: Distancia entre flechas en metros (default: 150m)
+    /// - Parameter interval: Distancia entre flechas en metros (default: 300m)
     /// - Returns: Array de flechas direccionales
-    func calculateDirectionalArrows(interval: CLLocationDistance = 150) -> [RouteArrowAnnotation] {
+    func calculateDirectionalArrows(interval: CLLocationDistance = 300) -> [RouteArrowAnnotation] {
         guard let route = currentRoute?.route else {
             print("❌ calculateDirectionalArrows: No hay ruta en currentRoute")
             return []
@@ -373,7 +547,7 @@ class RouteManager: ObservableObject {
 
         var arrows: [RouteArrowAnnotation] = []
         var distanceAccumulated: CLLocationDistance = 0
-        var nextArrowDistance: CLLocationDistance = 50 // Primera flecha a 50m
+        var nextArrowDistance: CLLocationDistance = 100 // Primera flecha a 100m
 
         for i in 0..<coordinates.count - 1 {
             let coord1 = coordinates[i]
@@ -410,9 +584,9 @@ class RouteManager: ObservableObject {
 
         print("📍 Generadas \(arrows.count) flechas antes de filtrar")
 
-        // Filtrar flechas muy cerca del destino (últimos 100m)
+        // Filtrar flechas muy cerca del destino (últimos 200m)
         let totalDistance = route.distance
-        arrows = arrows.filter { $0.distanceFromStart < totalDistance - 100 }
+        arrows = arrows.filter { $0.distanceFromStart < totalDistance - 200 }
 
         print("🎯 Calculadas \(arrows.count) flechas direccionales después de filtrar")
 
@@ -573,3 +747,4 @@ private extension EdgeInsets {
         return EdgeInsets(top: value, leading: value, bottom: value, trailing: value)
     }
 }
+
