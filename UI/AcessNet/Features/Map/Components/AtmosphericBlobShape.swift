@@ -156,12 +156,14 @@ struct AnimatedAtmosphericBlob: View {
         }
         .frame(width: 80, height: 80)
         .onAppear {
+            print("🎨 [AnimatedAtmosphericBlob] onAppear - zone: \(zone.level), enableRotation: \(enableRotation)")
             startBreathingAnimation()
             if enableRotation {
                 startRotationAnimation()
             }
         }
         .onChange(of: enableRotation) { _, newValue in
+            print("🔄 [AnimatedAtmosphericBlob] onChange enableRotation: \(newValue)")
             if newValue {
                 startRotationAnimation()
             } else {
@@ -179,6 +181,7 @@ struct AnimatedAtmosphericBlob: View {
     // MARK: - Animations (Optimizadas para rendimiento)
 
     private func startBreathingAnimation() {
+        print("💨 [AnimatedAtmosphericBlob] Iniciando breathing animation (8.0s)")
         // Duración aumentada: 4.0s → 8.0s (reduce frecuencia de re-render)
         withAnimation(
             .easeInOut(duration: 8.0)
@@ -189,6 +192,7 @@ struct AnimatedAtmosphericBlob: View {
     }
 
     private func startRotationAnimation() {
+        print("🔄 [AnimatedAtmosphericBlob] Iniciando rotation animation (120.0s)")
         // Duración aumentada: 60.0s → 120.0s (rotación más sutil y eficiente)
         withAnimation(
             .linear(duration: 120.0)
@@ -215,7 +219,9 @@ struct EnhancedAirQualityOverlay: View {
     @State private var opacity: Double = 0.0
 
     var body: some View {
-        AnimatedAtmosphericBlob(
+        let _ = print("🏗️ [EnhancedAirQualityOverlay] body rendering - settingsKey: \(settingsKey), index: \(index)")
+
+        return AnimatedAtmosphericBlob(
             zone: zone,
             enableRotation: appSettings.enableAirQualityRotation
         )
@@ -223,6 +229,7 @@ struct EnhancedAirQualityOverlay: View {
         .scaleEffect(scale)
         .opacity(opacity)
         .onAppear {
+            print("✨ [EnhancedAirQualityOverlay] onAppear - index: \(index), settingsKey: \(settingsKey)")
             // Stagger animation basado en index
             let delay = Double(index) * 0.05
 
@@ -235,6 +242,7 @@ struct EnhancedAirQualityOverlay: View {
             }
         }
         .onChange(of: isVisible) { _, newValue in
+            print("👁️ [EnhancedAirQualityOverlay] onChange isVisible: \(newValue), index: \(index)")
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 scale = newValue ? 1.0 : 0.0
                 opacity = newValue ? 1.0 : 0.0
