@@ -34,34 +34,69 @@ struct SearchBarView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                // Icono de búsqueda
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 18))
-                    .foregroundColor(isFocused ? .blue : .gray)
-                    .animation(.easeInOut(duration: 0.2), value: isFocused)
+                // Icono de búsqueda con animación
+                ZStack {
+                    Circle()
+                        .fill(isFocused ? Color.blue.opacity(0.12) : Color.clear)
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: isFocused ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                        .font(.system(size: 18, weight: isFocused ? .semibold : .regular))
+                        .foregroundStyle(
+                            isFocused ?
+                            LinearGradient(
+                                colors: [.blue, .blue.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ) :
+                            LinearGradient(
+                                colors: [.gray, .gray.opacity(0.9)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
 
                 // Campo de texto
                 TextField(placeholder, text: $searchText)
-                    .font(.system(size: 16))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.primary)
                     .focused($isFocused)
                     .submitLabel(.search)
                     .onSubmit {
+                        let impact = UIImpactFeedbackGenerator(style: .light)
+                        impact.impactOccurred()
                         onSubmit()
                     }
                     .autocorrectionDisabled()
+                    .onChange(of: isFocused) { newValue in
+                        if newValue {
+                            let impact = UIImpactFeedbackGenerator(style: .light)
+                            impact.impactOccurred()
+                        }
+                    }
 
-                // Botón de limpiar
+                // Botón de limpiar con animación mejorada
                 if !searchText.isEmpty {
                     Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .light)
+                        impact.impactOccurred()
+
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             searchText = ""
                             onClear()
                         }
                     }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                            .font(.system(size: 18))
+                        ZStack {
+                            Circle()
+                                .fill(Color.gray.opacity(0.15))
+                                .frame(width: 24, height: 24)
+
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.gray)
+                        }
                     }
                     .transition(.scale.combined(with: .opacity))
                 }
@@ -69,31 +104,73 @@ struct SearchBarView: View {
                 // Botón de cancelar cuando está enfocado
                 if isFocused {
                     Button("Cancel") {
+                        let impact = UIImpactFeedbackGenerator(style: .light)
+                        impact.impactOccurred()
+
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             searchText = ""
                             isFocused = false
                             onClear()
                         }
                     }
-                    .font(.body)
-                    .foregroundStyle(.blue)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .blue.opacity(0.9)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, isFocused ? 18 : 16)
+            .padding(.vertical, isFocused ? 14 : 12)
             .background(
-                RoundedRectangle(cornerRadius: 25)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 25)
-                            .strokeBorder(
-                                isFocused ? Color.blue.opacity(0.3) : Color.clear,
-                                lineWidth: 2
+                ZStack {
+                    // Fondo con blur
+                    RoundedRectangle(cornerRadius: isFocused ? 28 : 25)
+                        .fill(.ultraThinMaterial)
+
+                    // Overlay de gradiente sutil
+                    RoundedRectangle(cornerRadius: isFocused ? 28 : 25)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(isFocused ? 0.15 : 0.1),
+                                    .white.opacity(isFocused ? 0.05 : 0.02)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                    )
+                        )
+
+                    // Borde con gradiente
+                    RoundedRectangle(cornerRadius: isFocused ? 28 : 25)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: isFocused ?
+                                [Color.blue.opacity(0.4), Color.blue.opacity(0.2)] :
+                                [Color.gray.opacity(0.15), Color.gray.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: isFocused ? 2 : 1
+                        )
+                }
             )
-            .shadow(color: .black.opacity(isFocused ? 0.2 : 0.15), radius: isFocused ? 20 : 15, x: 0, y: 5)
+            .shadow(
+                color: isFocused ? Color.blue.opacity(0.15) : .black.opacity(0.12),
+                radius: isFocused ? 20 : 15,
+                x: 0,
+                y: isFocused ? 8 : 5
+            )
+            .shadow(
+                color: .black.opacity(0.08),
+                radius: 4,
+                x: 0,
+                y: 2
+            )
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isFocused)
     }

@@ -52,58 +52,122 @@ enum AlertType: String, CaseIterable {
     }
 }
 
-// MARK: - Alert Annotation View
+// MARK: - Alert Annotation View (Modernizado)
 
 struct AlertAnnotationView: View {
     let alertType: AlertType
     let showPulse: Bool
 
-    @State private var animate = false
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var pulseOpacity: Double = 0.6
+    @State private var iconScale: CGFloat = 1.0
+    @State private var rotation: Double = 0
 
     var body: some View {
         ZStack {
-            // Efecto de pulso para alertas activas
+            // Efecto de pulso suave y elegante
             if showPulse {
+                // Primer anillo de pulso
                 Circle()
-                    .stroke(alertType.color, lineWidth: 3)
-                    .scaleEffect(animate ? 2.0 : 1.0)
-                    .opacity(animate ? 0.0 : 0.7)
-                    .frame(width: 50, height: 50)
-                    .animation(
-                        .easeOut(duration: 1.5)
-                        .repeatForever(autoreverses: false),
-                        value: animate
-                    )
-            }
-
-            // Icono principal
-            ZStack {
-                // Fondo con gradiente
-                Circle()
-                    .fill(
+                    .stroke(
                         LinearGradient(
-                            colors: alertType.gradientColors,
+                            colors: [alertType.color, alertType.color.opacity(0.3)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
-                        )
+                        ),
+                        lineWidth: 2
                     )
-                    .frame(width: 45, height: 45)
-                    .shadow(color: alertType.color.opacity(0.5), radius: 8, x: 0, y: 4)
+                    .scaleEffect(pulseScale)
+                    .opacity(pulseOpacity)
+                    .frame(width: 55, height: 55)
 
-                // Borde blanco
+                // Segundo anillo de pulso (efecto doble)
                 Circle()
-                    .strokeBorder(.white, lineWidth: 3)
-                    .frame(width: 45, height: 45)
-
-                // Icono
-                Image(systemName: alertType.icon)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
+                    .stroke(
+                        alertType.color.opacity(0.4),
+                        lineWidth: 1.5
+                    )
+                    .scaleEffect(pulseScale * 1.15)
+                    .opacity(pulseOpacity * 0.7)
+                    .frame(width: 55, height: 55)
             }
-            .scaleEffect(animate ? 1.1 : 1.0)
+
+            // Glow externo sutil
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            alertType.color.opacity(0.3),
+                            alertType.color.opacity(0.1),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 35
+                    )
+                )
+                .frame(width: 70, height: 70)
+                .blur(radius: 4)
+
+            // Icono principal con glassmorphism
+            ZStack {
+                // Fondo con glassmorphism
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        alertType.gradientColors[0].opacity(0.9),
+                                        alertType.gradientColors[1].opacity(0.8)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .shadow(color: alertType.color.opacity(0.4), radius: 12, x: 0, y: 6)
+                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+
+                // Borde con gradiente
+                Circle()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.8), .white.opacity(0.3)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2.5
+                    )
+                    .frame(width: 48, height: 48)
+
+                // Icono con efecto de brillo
+                Image(systemName: alertType.icon)
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+            }
+            .scaleEffect(iconScale)
         }
         .onAppear {
-            animate = true
+            // Animación de pulso suave
+            withAnimation(
+                .easeInOut(duration: 2.0)
+                .repeatForever(autoreverses: true)
+            ) {
+                pulseScale = 1.6
+                pulseOpacity = 0.0
+            }
+
+            // Animación sutil del icono
+            withAnimation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+            ) {
+                iconScale = 1.08
+            }
         }
     }
 }
@@ -213,42 +277,96 @@ struct Triangle: Shape {
     }
 }
 
-/// Pin de ubicación personalizado
+/// Pin de ubicación personalizado (Modernizado)
 struct CustomMapPin: View {
     let color: Color
     let icon: String
 
+    @State private var animate = false
+
     var body: some View {
         ZStack {
-            // Pin shape
+            // Glow effect
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            color.opacity(0.4),
+                            color.opacity(0.2),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 15,
+                        endRadius: 30
+                    )
+                )
+                .frame(width: 60, height: 60)
+                .blur(radius: 6)
+                .offset(y: -20)
+
+            // Pin shape moderno
             VStack(spacing: 0) {
+                // Círculo principal con glassmorphism
                 Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        color.opacity(0.95),
+                                        color.opacity(0.85)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay {
+                        // Borde con gradiente
+                        Circle()
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.9), .white.opacity(0.4)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 3
+                            )
+
+                        // Icono
+                        Image(systemName: icon)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
+                    }
+                    .shadow(color: color.opacity(0.5), radius: 10, x: 0, y: 5)
+                    .shadow(color: .black.opacity(0.25), radius: 3, x: 0, y: 2)
+
+                // Pointer bottom con gradiente
+                Triangle()
                     .fill(
                         LinearGradient(
-                            colors: [color, color.opacity(0.8)],
+                            colors: [color.opacity(0.9), color],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Circle()
-                            .strokeBorder(.white, lineWidth: 3)
-
-                        Image(systemName: icon)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
-
-                // Pointer bottom
-                Triangle()
-                    .fill(color)
-                    .frame(width: 12, height: 8)
-                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 2)
+                    .frame(width: 14, height: 9)
+                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+            }
+            .scaleEffect(animate ? 1.05 : 1.0)
+        }
+        .offset(y: -20)
+        .onAppear {
+            withAnimation(
+                .easeInOut(duration: 1.2)
+                .repeatForever(autoreverses: true)
+            ) {
+                animate = true
             }
         }
-        .offset(y: -20) // Ajustar para que el punto esté en la coordenada
     }
 }
 

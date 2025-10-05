@@ -126,16 +126,8 @@ struct EnhancedMapView: View {
     // MARK: - Route Arrows State
     @State private var routeArrows: [RouteArrowAnnotation] = []
 
-    // MARK: - Supreme Route Animation States
+    // MARK: - Route Animation State (Optimizado)
     @State private var dashPhase: CGFloat = 0  // Marching ants
-    @State private var hueRotation: Double = 0  // Gradient shimmer
-    @State private var travelingParticles: [TravelingParticle] = []  // Flowing particles
-    @State private var energyPulses: [EnergyPulse] = []  // Expansion pulses
-    @State private var multicolorPoints: [MulticolorElevatedPoint] = []  // Elevated multicolor points
-
-    // MARK: - Animation Timers
-    @State private var particleTimer: Timer?
-    @State private var pulseTimer: Timer?
 
     private let bottomBarHeight: CGFloat = UIScreen.main.bounds.height * 0.1
 
@@ -290,42 +282,21 @@ struct EnhancedMapView: View {
         }
         .onReceive(routeManager.$currentRoute) { newRoute in
             if newRoute != nil {
-                // 🎯 Calcular flechas direccionales
+                // Calcular flechas direccionales
                 routeArrows = routeManager.calculateDirectionalArrows()
 
-                // 🌈 Inicializar animaciones de polyline
-                withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                    dashPhase = 25  // Marching ants
+                // Inicializar animación de marching ants (simplificada)
+                withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                    dashPhase = 22
                 }
 
-                withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
-                    hueRotation = 360  // Shimmer gradiente
-                }
-
-                // ⚡ Generar partículas viajeras
-                travelingParticles = routeManager.generateTravelingParticles(count: 5)
-                startParticleAnimation()
-
-                // 🔮 Iniciar timer de pulsos de energía
-                startEnergyPulseTimer()
-
-                // 🌟 Generar puntos elevados multicolor
-                multicolorPoints = routeManager.generateMulticolorElevatedPoints()
-
-                print("✅ Animación suprema iniciada!")
-                print("   - Flechas: \(routeArrows.count)")
-                print("   - Partículas: \(travelingParticles.count)")
-                print("   - Puntos multicolor: \(multicolorPoints.count)")
+                print("✅ Animación de ruta iniciada!")
+                print("   - Flechas direccionales: \(routeArrows.count)")
 
             } else {
-                // Limpiar todo al quitar ruta
-                stopAllAnimations()
+                // Limpiar ruta
                 routeArrows = []
-                travelingParticles = []
-                energyPulses = []
-                multicolorPoints = []
                 dashPhase = 0
-                hueRotation = 0
             }
         }
     }
@@ -372,52 +343,47 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // 🌈 SUPREME ROUTE ANIMATION - 5 CAPAS COMBINADAS 🌈
+                // 🎨 ROUTE ANIMATION - Optimizada (3 capas elegantes)
                 if let routeInfo = routeManager.currentRoute {
 
-                    // ✨ CAPA 1: Gradiente Multicolor Brillante
+                    // CAPA 1: Base de ruta con gradiente suave
                     MapPolyline(routeInfo.polyline)
                         .stroke(
-                            Gradient(colors: [.cyan, .blue, .purple, .pink]),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round)
+                            LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.8),
+                                    Color.cyan.opacity(0.7),
+                                    Color.blue.opacity(0.8)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
                         )
 
-                    // 🔷 CAPA 2: Marching Ants Overlay (blanco semitransparente)
+                    // CAPA 2: Línea animada con marching ants elegante
                     MapPolyline(routeInfo.polyline)
                         .stroke(
-                            .white.opacity(0.6),
+                            LinearGradient(
+                                colors: [.white.opacity(0.7), .white.opacity(0.4)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
                             style: StrokeStyle(
-                                lineWidth: 6,
+                                lineWidth: 5,
                                 lineCap: .round,
                                 lineJoin: .round,
-                                dash: [12, 8],
+                                dash: [10, 12],
                                 dashPhase: dashPhase
                             )
                         )
-                }
 
-                // ⚡ CAPA 3: Partículas Viajando con Trail
-                ForEach(travelingParticles) { particle in
-                    Annotation("", coordinate: particle.coordinate) {
-                        TravelingParticleView(particle: particle)
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                // 🔮 CAPA 4: Pulsos de Energía
-                ForEach(energyPulses) { pulse in
-                    Annotation("", coordinate: pulse.coordinate) {
-                        EnergyPulseView(pulse: pulse)
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                // 🌟 CAPA 5: Puntos Elevados Multicolor con Glow
-                ForEach(multicolorPoints) { point in
-                    Annotation("", coordinate: point.coordinate) {
-                        ElevatedRoutePoint(index: point.index, total: multicolorPoints.count)
-                    }
-                    .annotationTitles(.hidden)
+                    // CAPA 3: Borde exterior sutil para profundidad
+                    MapPolyline(routeInfo.polyline)
+                        .stroke(
+                            Color.blue.opacity(0.3),
+                            style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round)
+                        )
                 }
 
                 // Directional arrows along route
@@ -646,101 +612,6 @@ struct EnhancedMapView: View {
         }
     }
 
-    // MARK: - Supreme Animation Methods
-
-    private func startParticleAnimation() {
-        // Detener timer anterior si existe
-        particleTimer?.invalidate()
-
-        // Timer para actualizar partículas cada 0.1s
-        particleTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [self] _ in
-            guard !travelingParticles.isEmpty else { return }
-
-            // Actualizar cada partícula
-            for i in 0..<travelingParticles.count {
-                var particle = travelingParticles[i]
-                // Incrementar progreso (0.02 = 2% cada 0.1s = viaje completo en 5s)
-                particle.progress += 0.02
-
-                // Si llega al final, reiniciar al inicio
-                if particle.progress >= 1.0 {
-                    particle.progress = 0.0
-                }
-
-                // Actualizar posición usando RouteManager
-                travelingParticles[i] = routeManager.updateParticle(particle, progress: particle.progress)
-            }
-        }
-    }
-
-    private func startEnergyPulseTimer() {
-        // Detener timer anterior si existe
-        pulseTimer?.invalidate()
-
-        // Timer para crear pulsos cada 5 segundos
-        pulseTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [self] _ in
-            guard let polyline = routeManager.currentRoute?.route.polyline,
-                  let startPoint = polyline.pointAt(fraction: 0.0) else { return }
-
-            // Crear nuevo pulso en el inicio
-            let pulse = EnergyPulse(coordinate: startPoint, progress: 0, scale: 1.0, opacity: 1.0)
-            energyPulses.append(pulse)
-
-            // Animar el pulso a lo largo de la ruta
-            animateEnergyPulse(pulse)
-        }
-
-        // Crear primer pulso inmediatamente
-        if let polyline = routeManager.currentRoute?.route.polyline,
-           let startPoint = polyline.pointAt(fraction: 0.0) {
-            let pulse = EnergyPulse(coordinate: startPoint, progress: 0, scale: 1.0, opacity: 1.0)
-            energyPulses.append(pulse)
-            animateEnergyPulse(pulse)
-        }
-    }
-
-    private func animateEnergyPulse(_ pulse: EnergyPulse) {
-        // Timer para actualizar pulso cada 0.05s durante 3s
-        var currentProgress: Double = 0.0
-        let updateInterval: TimeInterval = 0.05
-        let duration: TimeInterval = 3.0
-        let steps = Int(duration / updateInterval)
-
-        Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { timer in
-            currentProgress += 1.0 / Double(steps)
-
-            if currentProgress >= 1.0 {
-                timer.invalidate()
-                // Remover pulso cuando termine
-                energyPulses.removeAll { $0.id == pulse.id }
-                return
-            }
-
-            // Actualizar pulso en el array
-            if let index = energyPulses.firstIndex(where: { $0.id == pulse.id }) {
-                var updatedPulse = energyPulses[index]
-                updatedPulse.update(progress: currentProgress)
-
-                // Actualizar coordenada a lo largo de la ruta
-                if let polyline = routeManager.currentRoute?.route.polyline,
-                   let newCoord = polyline.pointAt(fraction: currentProgress) {
-                    updatedPulse.coordinate = newCoord
-                }
-
-                energyPulses[index] = updatedPulse
-            }
-        }
-    }
-
-    private func stopAllAnimations() {
-        particleTimer?.invalidate()
-        particleTimer = nil
-
-        pulseTimer?.invalidate()
-        pulseTimer = nil
-
-        print("⏹️ Todas las animaciones detenidas")
-    }
 }
 
 // MARK: - Map Style Type
@@ -779,7 +650,7 @@ enum MapStyleType {
 }
 
 
-// MARK: - Floating Action Button
+// MARK: - Floating Action Button (Modernizado)
 
 struct FloatingActionButton: View {
     let icon: String
@@ -789,41 +660,133 @@ struct FloatingActionButton: View {
     let action: () -> Void
 
     @State private var isPressed = false
+    @State private var glowIntensity: Double = 0.3
 
     var body: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            // Haptic feedback
+            let impact = UIImpactFeedbackGenerator(style: isPrimary ? .medium : .light)
+            impact.impactOccurred()
+
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.65)) {
                 isPressed = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isPressed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.65)) {
+                    isPressed = false
+                }
             }
             action()
         }) {
-            Image(systemName: icon)
-                .font(.system(size: isPrimary ? 28 : 22, weight: .bold))
-                .foregroundColor(isPrimary ? .white : color)
-                .frame(width: size, height: size)
-                .background(
+            ZStack {
+                // Glow effect para botón primario
+                if isPrimary {
                     Circle()
                         .fill(
-                            isPrimary ?
-                            LinearGradient(
-                                colors: [color, color.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
-                            LinearGradient(
-                                colors: [.white, .white],
-                                startPoint: .top,
-                                endPoint: .bottom
+                            RadialGradient(
+                                colors: [
+                                    color.opacity(glowIntensity),
+                                    color.opacity(glowIntensity * 0.5),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: size * 0.3,
+                                endRadius: size * 0.9
                             )
                         )
-                )
-                .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
+                        .frame(width: size * 1.3, height: size * 1.3)
+                        .blur(radius: 8)
+                }
+
+                // Fondo del botón
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Circle()
+                            .fill(
+                                isPrimary ?
+                                LinearGradient(
+                                    colors: [
+                                        color.opacity(0.95),
+                                        color.opacity(0.85)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ) :
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(0.9),
+                                        .white.opacity(0.85)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: isPrimary ?
+                                    [.white.opacity(0.6), .white.opacity(0.2)] :
+                                    [.black.opacity(0.1), .black.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: isPrimary ? 2 : 1.5
+                            )
+                    )
+                    .shadow(
+                        color: isPrimary ? color.opacity(0.4) : .black.opacity(0.15),
+                        radius: isPressed ? 8 : 12,
+                        x: 0,
+                        y: isPressed ? 3 : 6
+                    )
+                    .shadow(
+                        color: .black.opacity(0.1),
+                        radius: 3,
+                        x: 0,
+                        y: 2
+                    )
+
+                // Icono
+                Image(systemName: icon)
+                    .font(.system(size: isPrimary ? 28 : 22, weight: .semibold))
+                    .foregroundStyle(
+                        isPrimary ?
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.95)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ) :
+                        LinearGradient(
+                            colors: [color, color.opacity(0.9)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(
+                        color: isPrimary ? .black.opacity(0.3) : .clear,
+                        radius: 1,
+                        x: 0,
+                        y: 1
+                    )
+            }
         }
-        .scaleEffect(isPressed ? 0.9 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPressed)
+        .onAppear {
+            if isPrimary {
+                // Animación de glow pulsante
+                withAnimation(
+                    .easeInOut(duration: 1.8)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    glowIntensity = 0.5
+                }
+            }
+        }
     }
 }
 
@@ -880,38 +843,74 @@ struct AlertTypeButton: View {
 
     var body: some View {
         Button(action: {
+            // Haptic feedback mejorado
+            HapticAction.alertAdded.trigger()
+
             isPressed = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 isPressed = false
                 action()
             }
         }) {
             VStack(spacing: 8) {
                 ZStack {
+                    // Glow effect sutil
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    alertType.color.opacity(0.3),
+                                    alertType.color.opacity(0.15),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 25,
+                                endRadius: 35
+                            )
+                        )
+                        .frame(width: 70, height: 70)
+                        .blur(radius: 6)
+
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: alertType.gradientColors,
+                                colors: [
+                                    alertType.gradientColors[0],
+                                    alertType.gradientColors[1]
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 60, height: 60)
-                        .shadow(color: alertType.color.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .frame(width: 62, height: 62)
+
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.6), .white.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2.5
+                        )
+                        .frame(width: 62, height: 62)
 
                     Image(systemName: alertType.icon)
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
+                .shadow(color: alertType.color.opacity(0.4), radius: 12, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
 
                 Text(alertType.rawValue)
-                    .font(.caption.bold())
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
             }
         }
-        .scaleEffect(isPressed ? 0.9 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPressed)
     }
 }
 
