@@ -173,12 +173,20 @@ class RouteManager: ObservableObject {
     /// - Parameter interval: Distancia entre flechas en metros (default: 150m)
     /// - Returns: Array de flechas direccionales
     func calculateDirectionalArrows(interval: CLLocationDistance = 150) -> [RouteArrowAnnotation] {
-        guard let route = currentRoute?.route else { return [] }
+        guard let route = currentRoute?.route else {
+            print("❌ calculateDirectionalArrows: No hay ruta en currentRoute")
+            return []
+        }
 
         let polyline = route.polyline
         let coordinates = polyline.coordinates()
 
-        guard coordinates.count >= 2 else { return [] }
+        print("📊 Polyline tiene \(coordinates.count) coordenadas, distancia total: \(route.distance)m")
+
+        guard coordinates.count >= 2 else {
+            print("❌ Polyline tiene menos de 2 coordenadas")
+            return []
+        }
 
         var arrows: [RouteArrowAnnotation] = []
         var distanceAccumulated: CLLocationDistance = 0
@@ -217,11 +225,13 @@ class RouteManager: ObservableObject {
             distanceAccumulated += segmentDistance
         }
 
+        print("📍 Generadas \(arrows.count) flechas antes de filtrar")
+
         // Filtrar flechas muy cerca del destino (últimos 100m)
         let totalDistance = route.distance
         arrows = arrows.filter { $0.distanceFromStart < totalDistance - 100 }
 
-        print("🎯 Calculadas \(arrows.count) flechas direccionales")
+        print("🎯 Calculadas \(arrows.count) flechas direccionales después de filtrar")
 
         return arrows
     }
@@ -276,6 +286,99 @@ class RouteManager: ObservableObject {
 
         print("🎯 Calculados \(points.count) puntos elevados para visibilidad 3D")
 
+        return points
+    }
+
+    // MARK: - Animated Particles
+
+    /// Genera partículas iniciales para animación
+    /// - Parameter count: Número de partículas (default: 5)
+    /// - Returns: Array de partículas viajeras
+    func generateTravelingParticles(count: Int = 5) -> [TravelingParticle] {
+        guard let polyline = currentRoute?.route.polyline else { return [] }
+
+        var particles: [TravelingParticle] = []
+        let colors: [ParticleColor] = [.cyan, .blue, .purple, .pink, .rainbow]
+
+        for i in 0..<count {
+            // Distribuir partículas uniformemente al inicio
+            let initialProgress = Double(i) / Double(count)
+
+            if let pathInfo = polyline.pathInfo(at: initialProgress) {
+                let particle = TravelingParticle(
+                    coordinate: pathInfo.coordinate,
+                    heading: pathInfo.heading,
+                    progress: initialProgress,
+                    index: i,
+                    color: colors[i % colors.count]
+                )
+                particles.append(particle)
+            }
+        }
+
+        print("✨ Generadas \(particles.count) partículas viajeras")
+        return particles
+    }
+
+    /// Actualiza posición de partícula basada en progreso
+    /// - Parameters:
+    ///   - particle: Partícula a actualizar
+    ///   - progress: Nuevo progreso (0.0 - 1.0)
+    /// - Returns: Partícula actualizada
+    func updateParticle(_ particle: TravelingParticle, progress: Double) -> TravelingParticle {
+        guard let polyline = currentRoute?.route.polyline,
+              let pathInfo = polyline.pathInfo(at: progress) else {
+            return particle
+        }
+
+        var updated = particle
+        updated.coordinate = pathInfo.coordinate
+        updated.heading = pathInfo.heading
+        updated.progress = progress
+
+        return updated
+    }
+
+    // MARK: - Multicolor Elevated Points
+
+    /// Genera puntos elevados multicolor
+    /// - Parameter interval: Distancia entre puntos en metros (default: 40m)
+    /// - Returns: Array de puntos elevados multicolor
+    func generateMulticolorElevatedPoints(interval: CLLocationDistance = 40) -> [MulticolorElevatedPoint] {
+        guard let route = currentRoute?.route else { return [] }
+
+        let polyline = route.polyline
+        let coordinates = polyline.coordinates()
+
+        guard coordinates.count >= 2 else { return [] }
+
+        var points: [MulticolorElevatedPoint] = []
+        var distanceAccumulated: CLLocationDistance = 0
+        var nextPointDistance: CLLocationDistance = 0
+
+        for i in 0..<coordinates.count - 1 {
+            let coord1 = coordinates[i]
+            let coord2 = coordinates[i + 1]
+            let segmentDistance = coord1.distance(to: coord2)
+
+            while distanceAccumulated + segmentDistance >= nextPointDistance {
+                let distanceIntoSegment = nextPointDistance - distanceAccumulated
+                let fraction = distanceIntoSegment / segmentDistance
+                let pointCoordinate = coord1.interpolate(to: coord2, fraction: fraction)
+
+                points.append(MulticolorElevatedPoint(
+                    coordinate: pointCoordinate,
+                    index: points.count,
+                    distanceFromStart: nextPointDistance
+                ))
+
+                nextPointDistance += interval
+            }
+
+            distanceAccumulated += segmentDistance
+        }
+
+        print("🌈 Generados \(points.count) puntos elevados multicolor")
         return points
     }
 }

@@ -126,11 +126,16 @@ struct EnhancedMapView: View {
     // MARK: - Route Arrows State
     @State private var routeArrows: [RouteArrowAnnotation] = []
 
-    // MARK: - Elevated Route Points State (3D visibility)
-    @State private var elevatedPoints: [CLLocationCoordinate2D] = []
+    // MARK: - Supreme Route Animation States
+    @State private var dashPhase: CGFloat = 0  // Marching ants
+    @State private var hueRotation: Double = 0  // Gradient shimmer
+    @State private var travelingParticles: [TravelingParticle] = []  // Flowing particles
+    @State private var energyPulses: [EnergyPulse] = []  // Expansion pulses
+    @State private var multicolorPoints: [MulticolorElevatedPoint] = []  // Elevated multicolor points
 
-    // MARK: - Animated Dash Phase (marching ants effect)
-    @State private var dashPhase: CGFloat = 0
+    // MARK: - Animation Timers
+    @State private var particleTimer: Timer?
+    @State private var pulseTimer: Timer?
 
     private let bottomBarHeight: CGFloat = UIScreen.main.bounds.height * 0.1
 
@@ -284,22 +289,43 @@ struct EnhancedMapView: View {
             }
         }
         .onReceive(routeManager.$currentRoute) { newRoute in
-            // Calcular flechas direccionales y puntos elevados cuando cambie la ruta
             if newRoute != nil {
+                // 🎯 Calcular flechas direccionales
                 routeArrows = routeManager.calculateDirectionalArrows()
-                elevatedPoints = routeManager.calculateElevatedPoints()
 
-                // Iniciar animación de dashPhase
+                // 🌈 Inicializar animaciones de polyline
                 withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                    dashPhase = 30 // Longitud del patrón de dash
+                    dashPhase = 25  // Marching ants
                 }
 
-                print("✅ Flechas direccionales actualizadas: \(routeArrows.count)")
-                print("✅ Puntos elevados actualizados: \(elevatedPoints.count)")
+                withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
+                    hueRotation = 360  // Shimmer gradiente
+                }
+
+                // ⚡ Generar partículas viajeras
+                travelingParticles = routeManager.generateTravelingParticles(count: 5)
+                startParticleAnimation()
+
+                // 🔮 Iniciar timer de pulsos de energía
+                startEnergyPulseTimer()
+
+                // 🌟 Generar puntos elevados multicolor
+                multicolorPoints = routeManager.generateMulticolorElevatedPoints()
+
+                print("✅ Animación suprema iniciada!")
+                print("   - Flechas: \(routeArrows.count)")
+                print("   - Partículas: \(travelingParticles.count)")
+                print("   - Puntos multicolor: \(multicolorPoints.count)")
+
             } else {
+                // Limpiar todo al quitar ruta
+                stopAllAnimations()
                 routeArrows = []
-                elevatedPoints = []
+                travelingParticles = []
+                energyPulses = []
+                multicolorPoints = []
                 dashPhase = 0
+                hueRotation = 0
             }
         }
     }
@@ -346,55 +372,50 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // Route polyline with animated "marching ants" effect
+                // 🌈 SUPREME ROUTE ANIMATION - 5 CAPAS COMBINADAS 🌈
                 if let routeInfo = routeManager.currentRoute {
-                    // Capa 1: Sombra oscura animada
-                    MapPolyline(routeInfo.polyline)
-                        .stroke(
-                            .black.opacity(0.4),
-                            style: StrokeStyle(
-                                lineWidth: 12,
-                                lineCap: .round,
-                                lineJoin: .round,
-                                dash: [15, 10],
-                                dashPhase: dashPhase
-                            )
-                        )
-                        .mapOverlayLevel(level: .aboveLabels)
 
-                    // Capa 2: Ruta principal azul animada
+                    // ✨ CAPA 1: Gradiente Multicolor Brillante
                     MapPolyline(routeInfo.polyline)
                         .stroke(
-                            Color(red: 0.04, green: 0.52, blue: 1.0), // #0A84FF - Azul iOS brillante
-                            style: StrokeStyle(
-                                lineWidth: 8,
-                                lineCap: .round,
-                                lineJoin: .round,
-                                dash: [15, 10],
-                                dashPhase: dashPhase
-                            )
+                            Gradient(colors: [.cyan, .blue, .purple, .pink]),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round)
                         )
-                        .mapOverlayLevel(level: .aboveLabels)
 
-                    // Capa 3: Línea central blanca animada para contraste
+                    // 🔷 CAPA 2: Marching Ants Overlay (blanco semitransparente)
                     MapPolyline(routeInfo.polyline)
                         .stroke(
-                            .white,
+                            .white.opacity(0.6),
                             style: StrokeStyle(
-                                lineWidth: 3,
+                                lineWidth: 6,
                                 lineCap: .round,
                                 lineJoin: .round,
                                 dash: [12, 8],
-                                dashPhase: dashPhase * 1.2 // Velocidad ligeramente diferente
+                                dashPhase: dashPhase
                             )
                         )
-                        .mapOverlayLevel(level: .aboveLabels)
                 }
 
-                // Elevated route points - Visible above buildings in 3D
-                ForEach(Array(elevatedPoints.enumerated()), id: \.offset) { index, coordinate in
-                    Annotation("", coordinate: coordinate) {
-                        ElevatedRoutePoint(index: index, total: elevatedPoints.count)
+                // ⚡ CAPA 3: Partículas Viajando con Trail
+                ForEach(travelingParticles) { particle in
+                    Annotation("", coordinate: particle.coordinate) {
+                        TravelingParticleView(particle: particle)
+                    }
+                    .annotationTitles(.hidden)
+                }
+
+                // 🔮 CAPA 4: Pulsos de Energía
+                ForEach(energyPulses) { pulse in
+                    Annotation("", coordinate: pulse.coordinate) {
+                        EnergyPulseView(pulse: pulse)
+                    }
+                    .annotationTitles(.hidden)
+                }
+
+                // 🌟 CAPA 5: Puntos Elevados Multicolor con Glow
+                ForEach(multicolorPoints) { point in
+                    Annotation("", coordinate: point.coordinate) {
+                        ElevatedRoutePoint(index: point.index, total: multicolorPoints.count)
                     }
                     .annotationTitles(.hidden)
                 }
@@ -623,6 +644,102 @@ struct EnhancedMapView: View {
                 showRouteToast = false
             }
         }
+    }
+
+    // MARK: - Supreme Animation Methods
+
+    private func startParticleAnimation() {
+        // Detener timer anterior si existe
+        particleTimer?.invalidate()
+
+        // Timer para actualizar partículas cada 0.1s
+        particleTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [self] _ in
+            guard !travelingParticles.isEmpty else { return }
+
+            // Actualizar cada partícula
+            for i in 0..<travelingParticles.count {
+                var particle = travelingParticles[i]
+                // Incrementar progreso (0.02 = 2% cada 0.1s = viaje completo en 5s)
+                particle.progress += 0.02
+
+                // Si llega al final, reiniciar al inicio
+                if particle.progress >= 1.0 {
+                    particle.progress = 0.0
+                }
+
+                // Actualizar posición usando RouteManager
+                travelingParticles[i] = routeManager.updateParticle(particle, progress: particle.progress)
+            }
+        }
+    }
+
+    private func startEnergyPulseTimer() {
+        // Detener timer anterior si existe
+        pulseTimer?.invalidate()
+
+        // Timer para crear pulsos cada 5 segundos
+        pulseTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [self] _ in
+            guard let polyline = routeManager.currentRoute?.route.polyline,
+                  let startPoint = polyline.pointAt(fraction: 0.0) else { return }
+
+            // Crear nuevo pulso en el inicio
+            let pulse = EnergyPulse(coordinate: startPoint, progress: 0, scale: 1.0, opacity: 1.0)
+            energyPulses.append(pulse)
+
+            // Animar el pulso a lo largo de la ruta
+            animateEnergyPulse(pulse)
+        }
+
+        // Crear primer pulso inmediatamente
+        if let polyline = routeManager.currentRoute?.route.polyline,
+           let startPoint = polyline.pointAt(fraction: 0.0) {
+            let pulse = EnergyPulse(coordinate: startPoint, progress: 0, scale: 1.0, opacity: 1.0)
+            energyPulses.append(pulse)
+            animateEnergyPulse(pulse)
+        }
+    }
+
+    private func animateEnergyPulse(_ pulse: EnergyPulse) {
+        // Timer para actualizar pulso cada 0.05s durante 3s
+        var currentProgress: Double = 0.0
+        let updateInterval: TimeInterval = 0.05
+        let duration: TimeInterval = 3.0
+        let steps = Int(duration / updateInterval)
+
+        Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { timer in
+            currentProgress += 1.0 / Double(steps)
+
+            if currentProgress >= 1.0 {
+                timer.invalidate()
+                // Remover pulso cuando termine
+                energyPulses.removeAll { $0.id == pulse.id }
+                return
+            }
+
+            // Actualizar pulso en el array
+            if let index = energyPulses.firstIndex(where: { $0.id == pulse.id }) {
+                var updatedPulse = energyPulses[index]
+                updatedPulse.update(progress: currentProgress)
+
+                // Actualizar coordenada a lo largo de la ruta
+                if let polyline = routeManager.currentRoute?.route.polyline,
+                   let newCoord = polyline.pointAt(fraction: currentProgress) {
+                    updatedPulse.coordinate = newCoord
+                }
+
+                energyPulses[index] = updatedPulse
+            }
+        }
+    }
+
+    private func stopAllAnimations() {
+        particleTimer?.invalidate()
+        particleTimer = nil
+
+        pulseTimer?.invalidate()
+        pulseTimer = nil
+
+        print("⏹️ Todas las animaciones detenidas")
     }
 }
 

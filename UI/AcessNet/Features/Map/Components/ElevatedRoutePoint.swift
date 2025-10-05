@@ -13,56 +13,72 @@ struct ElevatedRoutePoint: View {
     let index: Int
     let total: Int
 
+    @State private var rotationAngle: Double = 0
     @State private var isPulsing = false
+
+    var gradientColors: [Color] {
+        let allColors: [Color] = [.cyan, .blue, .purple, .pink]
+        let startIndex = index % allColors.count
+        return (0..<4).map { i in allColors[(startIndex + i) % allColors.count] }
+    }
 
     var body: some View {
         ZStack {
-            // Glow effect
+            // Outer glow pulsante multicolor
             Circle()
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(red: 0.04, green: 0.52, blue: 1.0).opacity(0.6),
-                            Color.clear
+                            gradientColors[0].opacity(0.6),
+                            gradientColors[1].opacity(0.3),
+                            .clear
                         ],
                         center: .center,
                         startRadius: 0,
-                        endRadius: 12
+                        endRadius: 16
                     )
                 )
-                .frame(width: 24, height: 24)
-                .blur(radius: 4)
-                .scaleEffect(isPulsing ? 1.3 : 1.0)
+                .frame(width: 32, height: 32)
+                .blur(radius: 6)
+                .scaleEffect(isPulsing ? 1.4 : 1.0)
 
-            // Main point
+            // Main point con gradiente angular giratorio
             Circle()
                 .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0, green: 1, blue: 1), // Cyan
-                            Color(red: 0.04, green: 0.52, blue: 1.0) // Blue
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                    AngularGradient(
+                        colors: gradientColors,
+                        center: .center,
+                        startAngle: .degrees(rotationAngle),
+                        endAngle: .degrees(rotationAngle + 360)
                     )
                 )
-                .frame(width: 10, height: 10)
-                .shadow(color: .cyan.opacity(0.8), radius: 4, x: 0, y: 2)
+                .frame(width: 12, height: 12)
+                .multicolorGlow(colors: gradientColors, radius: 10, intensity: 1.0)
                 .overlay(
                     Circle()
-                        .strokeBorder(.white, lineWidth: 1.5)
+                        .strokeBorder(.white, lineWidth: 2)
                 )
         }
         .onAppear {
-            // Stagger animation based on index for wave effect
-            let delay = Double(index) * 0.03
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // Stagger pulse animation
+            let pulseDelay = Double(index) * 0.03
+            DispatchQueue.main.asyncAfter(deadline: .now() + pulseDelay) {
                 withAnimation(
-                    .easeInOut(duration: 1.0)
+                    .easeInOut(duration: 1.5)
                     .repeatForever(autoreverses: true)
                 ) {
                     isPulsing = true
+                }
+            }
+
+            // Stagger rotation animation
+            let rotationDelay = Double(index) * 0.05
+            DispatchQueue.main.asyncAfter(deadline: .now() + rotationDelay) {
+                withAnimation(
+                    .linear(duration: 3.0)
+                    .repeatForever(autoreverses: false)
+                ) {
+                    rotationAngle = 360
                 }
             }
         }
