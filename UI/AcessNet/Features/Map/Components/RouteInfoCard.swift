@@ -358,6 +358,271 @@ struct RouteErrorView: View {
     }
 }
 
+// MARK: - Enhanced Route Info Card with Air Quality
+
+/// Card mejorado que muestra ruta con datos de calidad del aire
+struct EnhancedRouteInfoCard: View {
+    let scoredRoute: ScoredRoute
+    let isCalculating: Bool
+    let onClear: () -> Void
+    let onStartNavigation: (() -> Void)?
+    let showComparison: RouteComparison?
+
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Header con información básica
+            headerView
+
+            // Métricas de distancia y tiempo
+            distanceTimeView
+
+            // Air quality metrics (si están disponibles)
+            if let analysis = scoredRoute.airQualityAnalysis {
+                airQualityMetricsView(analysis: analysis)
+            }
+
+            // Comparison con otra ruta (opcional)
+            if let comparison = showComparison {
+                comparisonView(comparison: comparison)
+            }
+
+            // Botones de acción
+            actionButtons
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 5)
+    }
+
+    // MARK: - Subviews
+
+    private var headerView: some View {
+        HStack(spacing: 12) {
+            // Ícono de ruta
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.2), .blue.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .blue.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 8) {
+                    Text("Best Route")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+
+                    // Badge de ranking
+                    if let rank = scoredRoute.rankPosition {
+                        Text("#\(rank)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(.blue)
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Text(scoredRoute.scoreDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            // Botón cerrar
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+                onClear()
+            }) {
+                ZStack {
+                    Circle()
+                        .fill(Color.gray.opacity(0.15))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.gray)
+                }
+            }
+        }
+    }
+
+    private var distanceTimeView: some View {
+        HStack(spacing: 16) {
+            // Distancia
+            EnhancedInfoBadge(
+                icon: "arrow.left.and.right",
+                value: scoredRoute.routeInfo.distanceFormatted,
+                label: "Distance",
+                color: .blue
+            )
+
+            Divider()
+                .frame(height: 35)
+
+            // Tiempo
+            EnhancedInfoBadge(
+                icon: "clock.fill",
+                value: scoredRoute.routeInfo.timeFormatted,
+                label: "Duration",
+                color: .green
+            )
+        }
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func airQualityMetricsView(analysis: AirQualityRouteAnalysis) -> some View {
+        VStack(spacing: 12) {
+            Divider()
+
+            HStack(spacing: 12) {
+                // AQI compact badge
+                AirQualityBadge(aqi: analysis.averageAQI, compact: true)
+
+                // PM2.5
+                PM25Indicator(pm25: analysis.averagePM25)
+
+                Spacer()
+
+                // Health risk badge
+                HealthRiskBadge(healthRisk: analysis.overallHealthRisk)
+            }
+
+            // Score combinado
+            HStack(spacing: 16) {
+                scoreIndicator(
+                    label: "Speed",
+                    score: scoredRoute.timeScore,
+                    color: .blue
+                )
+
+                scoreIndicator(
+                    label: "Air Quality",
+                    score: scoredRoute.airQualityScore,
+                    color: .green
+                )
+
+                scoreIndicator(
+                    label: "Combined",
+                    score: scoredRoute.combinedScore,
+                    color: .purple
+                )
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func scoreIndicator(label: String, score: Double, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text("\(Int(score))")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func comparisonView(comparison: RouteComparison) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(comparison.shortDescription)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Text("vs. alternative route")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color.blue.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 12) {
+            // Botón Start Navigation (opcional)
+            if let startNavigation = onStartNavigation {
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    startNavigation()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("Start")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                .blue.opacity(0.95),
+                                .blue.opacity(0.85)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: .blue.opacity(0.4), radius: 8, x: 0, y: 4)
+                }
+            }
+
+            // Botón Clear Route
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+                onClear()
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Clear")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.red)
+                .frame(maxWidth: onStartNavigation == nil ? .infinity : nil)
+                .padding(.horizontal, onStartNavigation == nil ? 0 : 20)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(.red.opacity(0.12))
+                )
+            }
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview("Route Info Card") {

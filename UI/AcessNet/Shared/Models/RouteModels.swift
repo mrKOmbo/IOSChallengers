@@ -13,9 +13,13 @@ import CoreLocation
 
 /// Preferencias para el cálculo de rutas
 enum RoutePreference {
-    case fastest        // Ruta más rápida
-    case shortest       // Ruta más corta
-    case avoidHighways  // Evitar autopistas
+    case fastest                                          // Ruta más rápida (100% tiempo)
+    case shortest                                         // Ruta más corta
+    case avoidHighways                                    // Evitar autopistas
+    case cleanestAir                                      // Mejor calidad del aire (100% aire)
+    case balanced                                         // Balanceado (50% tiempo + 50% aire)
+    case healthOptimized                                  // Optimizado para salud (30% tiempo + 70% aire)
+    case customWeighted(timeWeight: Double, airQualityWeight: Double)  // Pesos personalizados
 
     var transportType: MKDirectionsTransportType {
         return .automobile
@@ -23,6 +27,16 @@ enum RoutePreference {
 
     var requestsAlternateRoutes: Bool {
         return true
+    }
+
+    /// Indica si esta preferencia requiere datos de calidad del aire
+    var requiresAirQualityData: Bool {
+        switch self {
+        case .fastest, .shortest, .avoidHighways:
+            return false
+        case .cleanestAir, .balanced, .healthOptimized, .customWeighted:
+            return true
+        }
     }
 }
 

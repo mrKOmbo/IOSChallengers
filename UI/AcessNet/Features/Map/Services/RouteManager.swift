@@ -14,11 +14,17 @@ class RouteManager: ObservableObject {
 
     // MARK: - Published Properties
 
-    /// Ruta actual calculada
+    /// Ruta actual calculada (DEPRECATED - usar currentScoredRoute)
     @Published var currentRoute: RouteInfo?
 
-    /// Rutas alternativas disponibles
+    /// Rutas alternativas disponibles (DEPRECATED - usar alternateScoredRoutes)
     @Published var alternateRoutes: [RouteInfo] = []
+
+    /// Ruta actual con scoring de calidad del aire
+    @Published var currentScoredRoute: ScoredRoute?
+
+    /// Rutas alternativas con scoring
+    @Published var alternateScoredRoutes: [ScoredRoute] = []
 
     /// Indica si se está calculando una ruta
     @Published var isCalculating: Bool = false
@@ -29,7 +35,20 @@ class RouteManager: ObservableObject {
     // MARK: - Private Properties
 
     private var currentTask: Task<Void, Never>?
-    private var preference: RoutePreference = .fastest
+    private var preference: RoutePreference = .balanced  // Default: balanced
+
+    /// Servicio de API de calidad del aire
+    private let airQualityService: AirQualityAPIService
+
+    /// Flag para usar mock service (testing sin backend)
+    private var useMockService: Bool = true  // Cambiar a false cuando tengas backend real
+
+    // MARK: - Initialization
+
+    init(useMockService: Bool = true) {
+        self.useMockService = useMockService
+        self.airQualityService = useMockService ? MockAirQualityAPIService() : AirQualityAPIService.shared
+    }
 
     // MARK: - Public Methods
 
@@ -88,11 +107,11 @@ class RouteManager: ObservableObject {
         request.source = MKMapItem(placemark: originPlacemark)
         request.destination = MKMapItem(placemark: destinationPlacemark)
         request.transportType = preference.transportType
-        request.requestsAlternateRoutes = preference.requestsAlternateRoutes
+        request.requestsAlternateRoutes = true  // Siempre pedir alternativas para scoring
 
         // Configurar opciones según preferencia
         switch preference {
-        case .fastest:
+        case .fastest, .cleanestAir, .balanced, .healthOptimized, .customWeighted:
             // Por defecto MKDirections optimiza para la ruta más rápida
             break
         case .shortest:
@@ -118,14 +137,37 @@ class RouteManager: ObservableObject {
                 errorMessage = "No se encontró ninguna ruta disponible"
                 currentRoute = nil
                 alternateRoutes = []
+                currentScoredRoute = nil
+                alternateScoredRoutes = []
             } else {
-                // Ordenar según preferencia
-                let sortedRoutes = sortRoutes(routes)
+                print("✅ Apple Maps retornó \(routes.count) rutas")
 
-                currentRoute = sortedRoutes.first
-                alternateRoutes = Array(sortedRoutes.dropFirst())
+                // Si la preferencia requiere datos de aire, hacer scoring avanzado
+                if preference.requiresAirQualityData {
+                    await performAirQualityScoring(routes: routes)
+                } else {
+                    // Modo legacy: solo ordenar por tiempo
+                    let sortedRoutes = sortRoutes(routes)
+                    currentRoute = sortedRoutes.first
+                    alternateRoutes = Array(sortedRoutes.dropFirst())
 
-                print("✅ Ruta calculada: \(currentRoute?.distanceFormatted ?? "N/A"), tiempo: \(currentRoute?.timeFormatted ?? "N/A")")
+                    // También crear scored routes sin datos de aire
+                    let fastestTime = routes.map { $0.expectedTravelTime }.min() ?? 0
+                    let scoredRoutes = routes.map { routeInfo in
+                        ScoredRoute(
+                            routeInfo: routeInfo,
+                            airQualityAnalysis: nil,
+                            fastestTime: fastestTime,
+                            cleanestAQI: 0,
+                            preference: preference
+                        )
+                    }
+
+                    currentScoredRoute = scoredRoutes.first
+                    alternateScoredRoutes = Array(scoredRoutes.dropFirst())
+
+                    print("✅ Ruta calculada: \(currentRoute?.distanceFormatted ?? "N/A"), tiempo: \(currentRoute?.timeFormatted ?? "N/A")")
+                }
 
                 if !alternateRoutes.isEmpty {
                     print("📍 \(alternateRoutes.count) rutas alternativas disponibles")
@@ -136,15 +178,156 @@ class RouteManager: ObservableObject {
             errorMessage = "No se pudo calcular la ruta: \(error.localizedDescription)"
             currentRoute = nil
             alternateRoutes = []
+            currentScoredRoute = nil
+            alternateScoredRoutes = []
         }
 
         isCalculating = false
     }
 
+    /// Realiza scoring avanzado con datos de calidad del aire
+    @MainActor
+    private func performAirQualityScoring(routes: [RouteInfo]) async {
+        print("🌍 Iniciando análisis de calidad del aire para \(routes.count) rutas...")
+
+        var routesWithAirQuality: [(RouteInfo, AirQualityRouteAnalysis?)] = []
+
+        // Para cada ruta, analizar calidad del aire
+        for (index, routeInfo) in routes.enumerated() {
+            print("  Analizando ruta \(index + 1)/\(routes.count)...")
+
+            do {
+                // Samplear coordenadas del polyline (cada 150m)
+                let sampledCoordinates = samplePolylineCoordinates(
+                    routeInfo.route.polyline,
+                    interval: 150
+                )
+
+                print("    - Polyline tiene \(sampledCoordinates.count) puntos muestreados")
+
+                // Consultar backend para análisis de calidad del aire
+                let airQualityAnalysis = try await airQualityService.analyzeRoute(
+                    coordinates: sampledCoordinates,
+                    samplingInterval: 150
+                )
+
+                print("    - AQI promedio: \(Int(airQualityAnalysis.averageAQI))")
+
+                // Guardar ruta con análisis
+                routesWithAirQuality.append((routeInfo, airQualityAnalysis))
+
+            } catch {
+                print("    ⚠️ Error analizando ruta: \(error.localizedDescription)")
+
+                // Si falla el análisis de aire, crear ruta sin datos de aire
+                routesWithAirQuality.append((routeInfo, nil))
+            }
+        }
+
+        // Calcular valores mínimos para normalización
+        let fastestTime = routes.map { $0.expectedTravelTime }.min() ?? 0
+        let cleanestAQI = routesWithAirQuality.compactMap { $0.1?.averageAQI }.min() ?? 50
+
+        // Crear ScoredRoutes con scoring normalizado
+        var finalScoredRoutes = routesWithAirQuality.enumerated().map { (index, tuple) in
+            ScoredRoute(
+                routeInfo: tuple.0,
+                airQualityAnalysis: tuple.1,
+                fastestTime: fastestTime,
+                cleanestAQI: cleanestAQI,
+                preference: preference,
+                rankPosition: index + 1
+            )
+        }
+
+        // Ordenar por score combinado (mayor a menor)
+        finalScoredRoutes.sort { $0.combinedScore > $1.combinedScore }
+
+        // Actualizar rank positions después de ordenar
+        for (index, _) in finalScoredRoutes.enumerated() {
+            finalScoredRoutes[index] = ScoredRoute(
+                id: finalScoredRoutes[index].id,
+                routeInfo: finalScoredRoutes[index].routeInfo,
+                airQualityAnalysis: finalScoredRoutes[index].airQualityAnalysis,
+                fastestTime: fastestTime,
+                cleanestAQI: cleanestAQI,
+                preference: preference,
+                rankPosition: index + 1
+            )
+        }
+
+        // Asignar rutas scored
+        currentScoredRoute = finalScoredRoutes.first
+        alternateScoredRoutes = Array(finalScoredRoutes.dropFirst())
+
+        // Mantener compatibilidad con legacy properties
+        currentRoute = currentScoredRoute?.routeInfo
+        alternateRoutes = alternateScoredRoutes.map { $0.routeInfo }
+
+        // Log resultado
+        if let best = currentScoredRoute {
+            print("🏆 Mejor ruta seleccionada:")
+            print("   - \(best.routeInfo.distanceFormatted), \(best.routeInfo.timeFormatted)")
+            print("   - AQI promedio: \(Int(best.averageAQI))")
+            print("   - Score combinado: \(Int(best.combinedScore))/100")
+            print("   - \(best.scoreDescription)")
+        }
+    }
+
+    /// Samplea coordenadas del polyline a intervalos regulares
+    private func samplePolylineCoordinates(_ polyline: MKPolyline, interval: CLLocationDistance) -> [CLLocationCoordinate2D] {
+        let allCoordinates = polyline.coordinates()
+        guard allCoordinates.count >= 2 else { return allCoordinates }
+
+        var sampledCoordinates: [CLLocationCoordinate2D] = []
+        var accumulatedDistance: CLLocationDistance = 0
+        var nextSampleDistance: CLLocationDistance = 0
+
+        // Siempre incluir primer punto
+        sampledCoordinates.append(allCoordinates[0])
+
+        for i in 0..<allCoordinates.count - 1 {
+            let coord1 = allCoordinates[i]
+            let coord2 = allCoordinates[i + 1]
+            let segmentDistance = coord1.distance(to: coord2)
+
+            accumulatedDistance += segmentDistance
+
+            // Si pasamos el siguiente punto de muestreo
+            while accumulatedDistance >= nextSampleDistance + interval {
+                nextSampleDistance += interval
+
+                // Interpolar punto en el segmento
+                let distanceIntoSegment = nextSampleDistance - (accumulatedDistance - segmentDistance)
+                let fraction = distanceIntoSegment / segmentDistance
+
+                if fraction >= 0 && fraction <= 1 {
+                    let sampledPoint = coord1.interpolate(to: coord2, fraction: fraction)
+                    sampledCoordinates.append(sampledPoint)
+                }
+            }
+        }
+
+        // Siempre incluir último punto
+        if let last = allCoordinates.last {
+            // Verificar si el último punto ya está incluido comparando coordenadas manualmente
+            let lastSampled = sampledCoordinates.last
+            let shouldAddLast = lastSampled == nil ||
+                abs(lastSampled!.latitude - last.latitude) > 0.0001 ||
+                abs(lastSampled!.longitude - last.longitude) > 0.0001
+
+            if shouldAddLast {
+                sampledCoordinates.append(last)
+            }
+        }
+
+        return sampledCoordinates
+    }
+
     /// Ordena las rutas según la preferencia establecida
     private func sortRoutes(_ routes: [RouteInfo]) -> [RouteInfo] {
         switch preference {
-        case .fastest:
+        case .fastest, .cleanestAir, .balanced, .healthOptimized, .customWeighted:
             return routes.sorted { $0.expectedTravelTime < $1.expectedTravelTime }
         case .shortest:
             return routes.sorted { $0.distanceInKm < $1.distanceInKm }
