@@ -58,7 +58,7 @@ enum RoutePreference {
 
 // MARK: - Destination Point
 
-/// Modelo para representar el punto de destino (Punto B)
+/// Model to represent the destination point (Point B)
 struct DestinationPoint: Identifiable, Equatable {
     let id = UUID()
     let coordinate: CLLocationCoordinate2D

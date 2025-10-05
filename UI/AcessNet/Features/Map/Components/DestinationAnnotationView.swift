@@ -2,7 +2,7 @@
 //  DestinationAnnotationView.swift
 //  AcessNet
 //
-//  Vista de anotación para el punto de destino (Punto B)
+//  Destination annotation view (Point B)
 //
 
 import SwiftUI
@@ -84,7 +84,7 @@ struct DestinationAnnotationView: View {
 
 // MARK: - Compact Destination View
 
-/// Vista compacta del destino para cuando está lejos
+/// Compact destination view for when it's far away
 struct CompactDestinationView: View {
     var body: some View {
         ZStack {
@@ -108,7 +108,7 @@ struct CompactDestinationView: View {
 
 // MARK: - Destination Card View
 
-/// Vista expandida con información del destino
+/// Expanded view with destination information
 struct DestinationCardView: View {
     let title: String
     let subtitle: String?
@@ -198,7 +198,7 @@ struct DestinationCardView: View {
 
 // MARK: - Destination Marker Style
 
-/// Diferentes estilos de marcador de destino
+/// Different destination marker styles
 enum DestinationMarkerStyle {
     case flag
     case pin

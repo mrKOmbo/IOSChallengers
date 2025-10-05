@@ -657,9 +657,9 @@ struct EnhancedMapView: View {
                         // Centrar en ubicación del usuario
                         gridCenter = location
                     case .destination(let destinationCoord):
-                        // Centrar en el destino (Punto B)
+                        // Center on destination (Point B)
                         gridCenter = destinationCoord
-                        print("📍 Grid centrado en Punto B: (\(String(format: "%.4f", destinationCoord.latitude)), \(String(format: "%.4f", destinationCoord.longitude)))")
+                        print("📍 Grid centered on Point B: (\(String(format: "%.4f", destinationCoord.latitude)), \(String(format: "%.4f", destinationCoord.longitude)))")
                     }
 
                     airQualityGridManager.updateGrid(center: gridCenter)
@@ -669,14 +669,14 @@ struct EnhancedMapView: View {
         .onChange(of: destination) { oldDestination, newDestination in
             // Actualizar punto de referencia del grid cuando cambie el destino
             if let dest = newDestination {
-                // Usuario estableció un destino → cambiar a Punto B
+                // User set a destination → change to Point B
                 airQualityReferencePoint = .destination(dest.coordinate)
 
-                // Limpiar búsqueda automáticamente
+                // Clear search automatically
                 searchManager.clearSearch()
                 isSearchFocused = false
 
-                print("🎯 Punto de referencia cambiado a: Destino (Punto B)")
+                print("🎯 Reference point changed to: Destination (Point B)")
 
                 // Solo actualizar grid si NO hay ruta activa (las rutas usan su propio grid)
                 if showAirQualityLayer && !hasActiveRoute {
@@ -774,7 +774,7 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // Destination annotation (Punto B)
+                // Destination annotation (Point B)
                 if let dest = destination {
                     Annotation(dest.title, coordinate: dest.coordinate) {
                         DestinationAnnotationView()
