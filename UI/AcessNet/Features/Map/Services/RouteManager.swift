@@ -225,6 +225,66 @@ class RouteManager: ObservableObject {
 
         return arrows
     }
+
+    // MARK: - Route Segment Points (Elevated Line)
+
+    /// Calcula puntos densos a lo largo de la ruta para simular línea elevada 3D
+    /// - Parameter interval: Distancia entre puntos en metros (default: 8m)
+    /// - Returns: Array de puntos de segmento de ruta
+    func calculateRouteSegmentPoints(interval: CLLocationDistance = 8) -> [RouteSegmentPoint] {
+        guard let route = currentRoute?.route else { return [] }
+
+        let polyline = route.polyline
+        let coordinates = polyline.coordinates()
+
+        guard coordinates.count >= 2 else { return [] }
+
+        var points: [RouteSegmentPoint] = []
+        var distanceAccumulated: CLLocationDistance = 0
+        var nextPointDistance: CLLocationDistance = 0 // Primer punto en el inicio
+
+        for i in 0..<coordinates.count - 1 {
+            let coord1 = coordinates[i]
+            let coord2 = coordinates[i + 1]
+
+            let segmentDistance = coord1.distance(to: coord2)
+
+            // Verificar si debemos colocar puntos en este segmento
+            while distanceAccumulated + segmentDistance >= nextPointDistance {
+                // Calcular qué fracción del segmento usar
+                let distanceIntoSegment = nextPointDistance - distanceAccumulated
+                let fraction = distanceIntoSegment / segmentDistance
+
+                // Interpolar coordenada
+                let pointCoordinate = coord1.interpolate(to: coord2, fraction: fraction)
+
+                // Crear punto
+                points.append(RouteSegmentPoint(
+                    coordinate: pointCoordinate,
+                    distanceFromStart: nextPointDistance,
+                    segmentIndex: i
+                ))
+
+                // Siguiente punto
+                nextPointDistance += interval
+            }
+
+            distanceAccumulated += segmentDistance
+        }
+
+        // Agregar punto final
+        if let lastCoord = coordinates.last {
+            points.append(RouteSegmentPoint(
+                coordinate: lastCoord,
+                distanceFromStart: route.distance,
+                segmentIndex: coordinates.count - 1
+            ))
+        }
+
+        print("📍 Calculados \(points.count) puntos de segmento para línea elevada")
+
+        return points
+    }
 }
 
 // MARK: - Helper Extensions

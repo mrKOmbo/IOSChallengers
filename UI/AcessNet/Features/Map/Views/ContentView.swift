@@ -126,6 +126,9 @@ struct EnhancedMapView: View {
     // MARK: - Route Arrows State
     @State private var routeArrows: [RouteArrowAnnotation] = []
 
+    // MARK: - Route Segment Points State (Elevated Line)
+    @State private var routeSegmentPoints: [RouteSegmentPoint] = []
+
     private let bottomBarHeight: CGFloat = UIScreen.main.bounds.height * 0.1
 
     var body: some View {
@@ -278,12 +281,15 @@ struct EnhancedMapView: View {
             }
         }
         .onReceive(routeManager.$currentRoute) { newRoute in
-            // Calcular flechas direccionales cuando cambie la ruta
+            // Calcular flechas direccionales y puntos de segmento cuando cambie la ruta
             if newRoute != nil {
                 routeArrows = routeManager.calculateDirectionalArrows()
+                routeSegmentPoints = routeManager.calculateRouteSegmentPoints()
                 print("✅ Flechas direccionales actualizadas: \(routeArrows.count)")
+                print("✅ Puntos de línea elevada actualizados: \(routeSegmentPoints.count)")
             } else {
                 routeArrows = []
+                routeSegmentPoints = []
             }
         }
     }
@@ -330,22 +336,30 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // Route polyline - Multiple layers for 3D visibility
+                // Route polyline - Multiple layers for 3D visibility (mantener para zoom lejano)
                 if let routeInfo = routeManager.currentRoute {
                     // Capa 1: Sombra oscura (más gruesa)
                     MapPolyline(routeInfo.polyline)
-                        .stroke(.black.opacity(0.4), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
+                        .stroke(.black.opacity(0.3), style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round))
 
                     // Capa 2: Ruta principal con gradiente azul brillante
                     MapPolyline(routeInfo.polyline)
                         .stroke(
                             Color(red: 0.04, green: 0.52, blue: 1.0), // #0A84FF - Azul iOS brillante
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
                         )
 
                     // Capa 3: Línea central blanca para contraste
                     MapPolyline(routeInfo.polyline)
-                        .stroke(.white, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        .stroke(.white, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                }
+
+                // Route segment points (elevated line) - Visible above buildings in 3D
+                ForEach(routeSegmentPoints) { point in
+                    Annotation("", coordinate: point.coordinate) {
+                        RouteSegmentMarker()
+                    }
+                    .annotationTitles(.hidden)
                 }
 
                 // Directional arrows along route
