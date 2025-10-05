@@ -6,8 +6,37 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		26F186182E92E5EF00E61467 /* AirWayWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 26F1860E2E92E5EE00E61467 /* AirWayWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		26F186162E92E5EF00E61467 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 262196942E80F60C007E3787 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 26F1860D2E92E5EE00E61467;
+			remoteInfo = "AirWayWatch Watch App";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		26F186192E92E5EF00E61467 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				26F186182E92E5EF00E61467 /* AirWayWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		2621969C2E80F60C007E3787 /* AirWay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirWay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		26F1860E2E92E5EE00E61467 /* AirWayWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AirWayWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -29,10 +58,22 @@
 			path = AcessNet;
 			sourceTree = "<group>";
 		};
+		26F1860F2E92E5EE00E61467 /* AirWayWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "AirWayWatch Watch App";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		262196992E80F60C007E3787 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26F1860B2E92E5EE00E61467 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -46,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				2621969E2E80F60C007E3787 /* AcessNet */,
+				26F1860F2E92E5EE00E61467 /* AirWayWatch Watch App */,
 				2621969D2E80F60C007E3787 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				2621969C2E80F60C007E3787 /* AirWay.app */,
+				26F1860E2E92E5EE00E61467 /* AirWayWatch Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -68,10 +111,12 @@
 				262196982E80F60C007E3787 /* Sources */,
 				262196992E80F60C007E3787 /* Frameworks */,
 				2621969A2E80F60C007E3787 /* Resources */,
+				26F186192E92E5EF00E61467 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				26F186172E92E5EF00E61467 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				2621969E2E80F60C007E3787 /* AcessNet */,
@@ -81,6 +126,28 @@
 			);
 			productName = AirWay;
 			productReference = 2621969C2E80F60C007E3787 /* AirWay.app */;
+			productType = "com.apple.product-type.application";
+		};
+		26F1860D2E92E5EE00E61467 /* AirWayWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 26F1861C2E92E5EF00E61467 /* Build configuration list for PBXNativeTarget "AirWayWatch Watch App" */;
+			buildPhases = (
+				26F1860A2E92E5EE00E61467 /* Sources */,
+				26F1860B2E92E5EE00E61467 /* Frameworks */,
+				26F1860C2E92E5EE00E61467 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				26F1860F2E92E5EE00E61467 /* AirWayWatch Watch App */,
+			);
+			name = "AirWayWatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "AirWayWatch Watch App";
+			productReference = 26F1860E2E92E5EE00E61467 /* AirWayWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -95,6 +162,9 @@
 				TargetAttributes = {
 					2621969B2E80F60C007E3787 = {
 						CreatedOnToolsVersion = 26.0;
+					};
+					26F1860D2E92E5EE00E61467 = {
+						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
 			};
@@ -113,12 +183,20 @@
 			projectRoot = "";
 			targets = (
 				2621969B2E80F60C007E3787 /* AirWay */,
+				26F1860D2E92E5EE00E61467 /* AirWayWatch Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		2621969A2E80F60C007E3787 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		26F1860C2E92E5EE00E61467 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -135,7 +213,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		26F1860A2E92E5EE00E61467 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		26F186172E92E5EF00E61467 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 26F1860D2E92E5EE00E61467 /* AirWayWatch Watch App */;
+			targetProxy = 26F186162E92E5EF00E61467 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		262196A52E80F60D007E3787 /* Debug */ = {
@@ -266,12 +359,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QF2R75VM2Y;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AcessNet/Info.plist;
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Algorithm djisttra";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"Se necesita tu ubicación para mostrarla en el mapa.\"";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -301,12 +393,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = QF2R75VM2Y;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AcessNet/Info.plist;
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Algorithm djisttra";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "\"Se necesita tu ubicación para mostrarla en el mapa.\"";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -329,6 +420,72 @@
 			};
 			name = Release;
 		};
+		26F1861A2E92E5EF00E61467 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = AirWayWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = xyz.KOmbo.AirWay;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.KOmbo.AirWay.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		26F1861B2E92E5EF00E61467 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QYUV8U45UV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = AirWayWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = xyz.KOmbo.AirWay;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = xyz.KOmbo.AirWay.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -346,6 +503,15 @@
 			buildConfigurations = (
 				262196A82E80F60D007E3787 /* Debug */,
 				262196A92E80F60D007E3787 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		26F1861C2E92E5EF00E61467 /* Build configuration list for PBXNativeTarget "AirWayWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				26F1861A2E92E5EF00E61467 /* Debug */,
+				26F1861B2E92E5EF00E61467 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

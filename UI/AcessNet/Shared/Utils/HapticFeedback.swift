@@ -5,7 +5,25 @@
 //  Sistema unificado de feedback háptico para micro-interacciones
 //
 
+#if canImport(UIKit)
 import UIKit
+#else
+// No-op haptic shims for non-UIKit platforms to allow compilation
+struct UIImpactFeedbackGenerator {
+    enum FeedbackStyle { case light, medium, heavy, rigid, soft }
+    init(style: FeedbackStyle) {}
+    func impactOccurred() {}
+}
+struct UINotificationFeedbackGenerator {
+    enum FeedbackType { case success, warning, error }
+    init() {}
+    func notificationOccurred(_ type: FeedbackType) {}
+}
+struct UISelectionFeedbackGenerator {
+    init() {}
+    func selectionChanged() {}
+}
+#endif
 import SwiftUI
 
 // MARK: - Haptic Feedback Manager
@@ -313,3 +331,4 @@ extension ButtonStyle where Self == HapticButtonStyle {
         HapticButtonStyle(hapticStyle: style, scaleEffect: scale)
     }
 }
+

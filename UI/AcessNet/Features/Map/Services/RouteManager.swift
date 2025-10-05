@@ -110,15 +110,16 @@ class RouteManager: ObservableObject {
     }
 
     /// Calcula la ruta desde un origen hasta un destino
-    func calculateRoute(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) {
+    func calculateRoute(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, destinationName: String = "Destination") {
         // Almacenar destino para recálculos
         lastDestination = destination
+        lastDestinationName = destinationName
 
         // Cancelar cualquier cálculo previo
         currentTask?.cancel()
 
         currentTask = Task { @MainActor in
-            await performRouteCalculation(from: origin, to: destination)
+            await performRouteCalculation(from: origin, to: destination, destinationName: destinationName)
         }
     }
 
@@ -134,17 +135,21 @@ class RouteManager: ObservableObject {
         errorMessage = nil
         isCalculating = false
         lastDestination = nil
+
+        // Limpiar ruta en el Apple Watch
+        PhoneConnectivityManager.shared.clearRouteOnWatch()
     }
 
     /// Recalcula la ruta actual con nueva ubicación de origen
     /// Nota: Requiere almacenar la coordenada de destino previamente
     var lastDestination: CLLocationCoordinate2D?
+    var lastDestinationName: String = "Destination"
 
     func updateOrigin(to newOrigin: CLLocationCoordinate2D) {
         guard let destination = lastDestination else {
             return
         }
-        calculateRoute(from: newOrigin, to: destination)
+        calculateRoute(from: newOrigin, to: destination, destinationName: lastDestinationName)
     }
 
     /// Re-analiza las rutas existentes con zonas de calidad del aire actualizadas
@@ -169,7 +174,7 @@ class RouteManager: ObservableObject {
     // MARK: - Private Methods
 
     @MainActor
-    private func performRouteCalculation(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async {
+    private func performRouteCalculation(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D, destinationName: String = "Destination") async {
         isCalculating = true
         errorMessage = nil
 
@@ -311,6 +316,9 @@ class RouteManager: ObservableObject {
             }
             print("   - Score combinado: \(Int(best.combinedScore))/100")
             print("   - \(best.scoreDescription)")
+
+            // Enviar ruta al Apple Watch
+            PhoneConnectivityManager.shared.sendRouteToWatch(from: best, destinationName: self.lastDestinationName)
         }
 
         optimizationProgress = 1.0
@@ -464,6 +472,9 @@ class RouteManager: ObservableObject {
             print("   - AQI promedio: \(Int(best.averageAQI))")
             print("   - Score combinado: \(Int(best.combinedScore))/100")
             print("   - \(best.scoreDescription)")
+
+            // Enviar ruta al Apple Watch
+            PhoneConnectivityManager.shared.sendRouteToWatch(from: best, destinationName: self.lastDestinationName)
         }
     }
 

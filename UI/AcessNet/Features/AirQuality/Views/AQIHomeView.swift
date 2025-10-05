@@ -15,6 +15,7 @@ struct AQIHomeView: View {
     @State private var searchText = ""
     @State private var realTimeAQI: AirQualityPoint?
     @State private var isLoadingRealData = false
+    @State private var showARView = false
 
     enum ForecastTab {
         case hourly
@@ -47,6 +48,9 @@ struct AQIHomeView: View {
                         // AQI Info Button (combines AQI Card + PM Indicators)
                         aqiInfoButton
 
+                        // AR Button
+                        arButton
+
                         // Weather Info Card
                         weatherCard
 
@@ -63,6 +67,9 @@ struct AQIHomeView: View {
             .navigationBarHidden(true)
         }
         .navigationViewStyle(.stack)
+        .fullScreenCover(isPresented: $showARView) {
+            ARParticlesView()
+        }
     }
 
     // MARK: - View Components
@@ -309,6 +316,70 @@ struct AQIHomeView: View {
                             .stroke(.white.opacity(0.2), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            )
+        }
+        .padding(.horizontal)
+    }
+
+    private var arButton: some View {
+        Button(action: {
+            showARView = true
+        }) {
+            HStack(spacing: 16) {
+                // AR Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple.opacity(0.8), .indigo.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 60, height: 60)
+                        .shadow(color: .purple.opacity(0.4), radius: 8, x: 0, y: 4)
+
+                    Image(systemName: "camera.metering.center.weighted")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+
+                // Text content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AR Air Quality")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    Text("Visualize invisible PM2.5 particles")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+
+                Spacer()
+
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.title3)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.purple.opacity(0.5),
+                                Color.indigo.opacity(0.5)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(.white.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .purple.opacity(0.3), radius: 12, x: 0, y: 6)
             )
         }
         .padding(.horizontal)
