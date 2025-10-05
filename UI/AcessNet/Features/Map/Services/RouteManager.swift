@@ -226,12 +226,12 @@ class RouteManager: ObservableObject {
         return arrows
     }
 
-    // MARK: - Route Segment Points (Elevated Line)
+    // MARK: - Elevated Route Points (for 3D visibility)
 
-    /// Calcula puntos densos a lo largo de la ruta para simular línea elevada 3D
-    /// - Parameter interval: Distancia entre puntos en metros (default: 5m)
-    /// - Returns: Array de puntos de segmento de ruta
-    func calculateRouteSegmentPoints(interval: CLLocationDistance = 5) -> [RouteSegmentPoint] {
+    /// Calcula puntos elevados estratégicos a lo largo de la ruta
+    /// - Parameter interval: Distancia entre puntos en metros (default: 40m)
+    /// - Returns: Array de coordenadas para puntos elevados
+    func calculateElevatedPoints(interval: CLLocationDistance = 40) -> [CLLocationCoordinate2D] {
         guard let route = currentRoute?.route else { return [] }
 
         let polyline = route.polyline
@@ -239,7 +239,7 @@ class RouteManager: ObservableObject {
 
         guard coordinates.count >= 2 else { return [] }
 
-        var points: [RouteSegmentPoint] = []
+        var points: [CLLocationCoordinate2D] = []
         var distanceAccumulated: CLLocationDistance = 0
         var nextPointDistance: CLLocationDistance = 0 // Primer punto en el inicio
 
@@ -257,13 +257,7 @@ class RouteManager: ObservableObject {
 
                 // Interpolar coordenada
                 let pointCoordinate = coord1.interpolate(to: coord2, fraction: fraction)
-
-                // Crear punto
-                points.append(RouteSegmentPoint(
-                    coordinate: pointCoordinate,
-                    distanceFromStart: nextPointDistance,
-                    segmentIndex: i
-                ))
+                points.append(pointCoordinate)
 
                 // Siguiente punto
                 nextPointDistance += interval
@@ -272,16 +266,15 @@ class RouteManager: ObservableObject {
             distanceAccumulated += segmentDistance
         }
 
-        // Agregar punto final
-        if let lastCoord = coordinates.last {
-            points.append(RouteSegmentPoint(
-                coordinate: lastCoord,
-                distanceFromStart: route.distance,
-                segmentIndex: coordinates.count - 1
-            ))
+        // Agregar punto final si no está muy cerca del último punto
+        if let lastCoord = coordinates.last, let lastPoint = points.last {
+            let distanceToEnd = lastPoint.distance(to: lastCoord)
+            if distanceToEnd > interval / 2 {
+                points.append(lastCoord)
+            }
         }
 
-        print("📍 Calculados \(points.count) puntos de segmento para línea elevada")
+        print("🎯 Calculados \(points.count) puntos elevados para visibilidad 3D")
 
         return points
     }
