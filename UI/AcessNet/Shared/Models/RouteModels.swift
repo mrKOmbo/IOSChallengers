@@ -71,12 +71,20 @@ struct LocationInfo: Identifiable {
     let title: String
     let subtitle: String?
     let distanceFromUser: String
+    let airQuality: AirQualityPoint
 
-    init(coordinate: CLLocationCoordinate2D, title: String, subtitle: String? = nil, distanceFromUser: String) {
+    init(
+        coordinate: CLLocationCoordinate2D,
+        title: String,
+        subtitle: String? = nil,
+        distanceFromUser: String,
+        airQuality: AirQualityPoint
+    ) {
         self.coordinate = coordinate
         self.title = title
         self.subtitle = subtitle
         self.distanceFromUser = distanceFromUser
+        self.airQuality = airQuality
     }
 
     /// Formatea las coordenadas para mostrar
@@ -84,6 +92,28 @@ struct LocationInfo: Identifiable {
         let lat = String(format: "%.4f", coordinate.latitude)
         let lon = String(format: "%.4f", coordinate.longitude)
         return "\(lat), \(lon)"
+    }
+
+    // MARK: - Air Quality Computed Properties
+
+    /// Nivel de calidad del aire
+    var aqiLevel: AQILevel {
+        return airQuality.level
+    }
+
+    /// Riesgo para la salud
+    var healthRisk: HealthRisk {
+        return airQuality.healthRisk
+    }
+
+    /// Indica si la calidad del aire es saludable (AQI < 100)
+    var isHealthySafety: Bool {
+        return airQuality.aqi < 100
+    }
+
+    /// Mensaje de salud según el nivel AQI
+    var healthMessage: String {
+        return aqiLevel.extendedHealthMessage
     }
 }
 

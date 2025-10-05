@@ -152,41 +152,21 @@ struct EnhancedMapView: View {
             }
             .padding(.top, 60)
 
-            // Controles superiores: barra de búsqueda y acciones del mapa
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    SearchBarView(
-                        searchText: $searchManager.searchQuery,
-                        isFocused: $isSearchFocused,
-                        placeholder: "Where to?",
-                        onSubmit: {
-                            // Opcional: submit search
-                        },
-                        onClear: {
-                            searchManager.clearSearch()
-                        }
-                    )
-                    .layoutPriority(1)
-                    .fadeIn(delay: 0.1)
-
-                    VStack(spacing: 15) {
-                        FloatingActionButton(
-                            icon: "location.fill",
-                            color: .green,
-                            size: 50
-                        ) {
-                            centerOnUser()
-                        }
-
-                        FloatingActionButton(
-                            icon: mapStyle.icon,
-                            color: .purple,
-                            size: 50
-                        ) {
-                            cycleMapStyle()
-                        }
+            // Controles superiores: barra de búsqueda
+            VStack(alignment: .leading, spacing: 0) {
+                SearchBarView(
+                    searchText: $searchManager.searchQuery,
+                    isFocused: $isSearchFocused,
+                    placeholder: "Where to?",
+                    onSubmit: {
+                        // Opcional: submit search
+                    },
+                    onClear: {
+                        searchManager.clearSearch()
                     }
-                }
+                )
+                .layoutPriority(1)
+                .fadeIn(delay: 0.1)
                 .padding(.horizontal)
                 .padding(.top, AppConstants.safeAreaTop + 12)
 
@@ -198,6 +178,7 @@ struct EnhancedMapView: View {
                         onSelect: handleSearchResultSelection
                     )
                     .padding(.horizontal)
+                    .padding(.top, -10)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
@@ -279,7 +260,7 @@ struct EnhancedMapView: View {
             // Botones flotantes (ocultar cuando búsqueda está activa, hay ruta, o se muestra location info)
             if !isSearchFocused && !hasActiveRoute && !showLocationInfo {
                 floatingButtons
-                    .padding(.bottom, tabBarHeight + 80)
+                    .padding(.bottom, tabBarHeight + 20)
             }
         }
         .ignoresSafeArea()
@@ -462,18 +443,28 @@ struct EnhancedMapView: View {
 
     private var floatingButtons: some View {
         HStack {
-            Spacer()
             VStack(spacing: 15) {
                 // Location button
                 FloatingActionButton(
                     icon: "location.fill",
-                    color: .blue,
+                    color: .green,
                     size: 50
                 ) {
                     centerOnUser()
                 }
+
+                // Map style button
+                FloatingActionButton(
+                    icon: mapStyle.icon,
+                    color: .purple,
+                    size: 50
+                ) {
+                    cycleMapStyle()
+                }
             }
-            .padding(.trailing, 20)
+            .padding(.leading, 20)
+
+            Spacer()
         }
     }
 
@@ -502,6 +493,14 @@ struct EnhancedMapView: View {
         // Centrar cámara en el punto seleccionado
         centerCamera(on: coordinate, distance: 800)
 
+        // Generar datos de calidad del aire simulados para esta ubicación
+        let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
+            for: coordinate,
+            includeExtendedMetrics: true
+        )
+
+        print("📊 AQI generado para \(coordinate.latitude), \(coordinate.longitude): \(Int(airQuality.aqi)) (\(airQuality.level.rawValue))")
+
         // Obtener información del lugar con reverse geocoding
         searchManager.reverseGeocode(coordinate: coordinate) { address in
             // Calcular distancia desde el usuario
@@ -521,15 +520,16 @@ struct EnhancedMapView: View {
                 distanceText = "Ubicación desconocida"
             }
 
-            // Crear LocationInfo
+            // Crear LocationInfo CON datos de calidad del aire
             let locationInfo = LocationInfo(
                 coordinate: coordinate,
                 title: address ?? "Ubicación Seleccionada",
                 subtitle: address,
-                distanceFromUser: distanceText
+                distanceFromUser: distanceText,
+                airQuality: airQuality  // ⭐ Incluir AQI simulado
             )
 
-            // Mostrar card con información
+            // Mostrar card con información y animación
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 selectedLocationInfo = locationInfo
                 showLocationInfo = true
