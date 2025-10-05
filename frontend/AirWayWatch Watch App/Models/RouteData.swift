@@ -49,7 +49,7 @@ struct WatchRouteData: Codable, Identifiable {
 
     var aqiColor: String {
         switch averageAQI {
-        case 0..<51: return "#7BC043"
+        case 0..<51: return "#E0E0E0"
         case 51..<101: return "#FDD835"
         case 101..<151: return "#FF9800"
         default: return "#E53935"

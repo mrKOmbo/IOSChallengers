@@ -160,7 +160,7 @@ struct AirQualityLegendView: View {
     private func colorForAQI(_ aqi: Double) -> Color {
         let level = AQILevel.from(aqi: Int(aqi))
         switch level {
-        case .good: return Color(hex: "#7BC043")
+        case .good: return Color(hex: "#E0E0E0")
         case .moderate: return Color(hex: "#F9A825")
         case .poor: return Color(hex: "#FF6F00")
         case .unhealthy: return Color(hex: "#E53935")
@@ -227,7 +227,7 @@ struct AirQualityLegendRow: View {
 
     private var color: Color {
         switch level {
-        case .good: return Color(hex: "#7BC043")
+        case .good: return Color(hex: "#E0E0E0")
         case .moderate: return Color(hex: "#F9A825")
         case .poor: return Color(hex: "#FF6F00")
         case .unhealthy: return Color(hex: "#E53935")
@@ -264,7 +264,7 @@ struct CompactAirQualityIndicator: View {
     private var color: Color {
         let level = AQILevel.from(aqi: Int(averageAQI))
         switch level {
-        case .good: return Color(hex: "#7BC043")
+        case .good: return Color(hex: "#E0E0E0")
         case .moderate: return Color(hex: "#F9A825")
         case .poor: return Color(hex: "#FF6F00")
         case .unhealthy: return Color(hex: "#E53935")

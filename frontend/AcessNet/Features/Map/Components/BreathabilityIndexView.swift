@@ -177,7 +177,7 @@ struct BreathabilityIndexView: View {
 
     private var breathabilityColor: Color {
         switch dominantLevel {
-        case .good: return Color(hex: "#7BC043")
+        case .good: return Color(hex: "#E0E0E0")
         case .moderate: return Color(hex: "#F9A825")
         case .poor: return Color(hex: "#FF6F00")
         case .unhealthy: return Color(hex: "#E53935")
@@ -309,7 +309,7 @@ struct CompactBreathabilityIndicator: View {
 
     private var breathabilityColor: Color {
         switch dominantLevel {
-        case .good: return Color(hex: "#7BC043")
+        case .good: return Color(hex: "#E0E0E0")
         case .moderate: return Color(hex: "#F9A825")
         case .poor: return Color(hex: "#FF6F00")
         case .unhealthy: return Color(hex: "#E53935")

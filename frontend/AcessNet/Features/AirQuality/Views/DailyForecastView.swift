@@ -569,7 +569,7 @@ struct ComparisonDayCard: View {
                     HStack(spacing: 4) {
                         Image(systemName: trendUp ? "arrow.up.right" : "arrow.down.right")
                             .font(.caption2)
-                            .foregroundColor(trendUp ? .red : .green)
+                            .foregroundColor(trendUp ? .red : Color(hex: "#E0E0E0"))
 
                         Text(day.qualityLevel.rawValue)
                             .font(.caption2.bold())
@@ -645,7 +645,7 @@ struct DayButton: View {
             VStack(spacing: 8) {
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(day.qualityLevel.color == "#7BC043" ? .green : .yellow)
+                        .fill(day.qualityLevel.color == "#E0E0E0" ? Color(hex: "#E0E0E0") : .yellow)
                         .frame(width: 8, height: 8)
 
                     Text(isToday ? "Today" : "\(day.shortDayName) \(String(format: "%02d", day.dayNumber))")
@@ -690,7 +690,7 @@ struct CircularAQIGauge: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#7BC043").opacity(0.2),
+                            Color(hex: "#E0E0E0").opacity(0.2),
                             Color(hex: "#FDD835").opacity(0.2),
                             Color(hex: "#FF9800").opacity(0.2),
                             Color(hex: "#E53935").opacity(0.2)
@@ -708,7 +708,7 @@ struct CircularAQIGauge: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#7BC043").opacity(0.15),
+                            Color(hex: "#E0E0E0").opacity(0.15),
                             Color(hex: "#FDD835").opacity(0.15),
                             Color(hex: "#FF9800").opacity(0.15),
                             Color(hex: "#E53935").opacity(0.15)
@@ -726,7 +726,7 @@ struct CircularAQIGauge: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#7BC043"),
+                            Color(hex: "#E0E0E0"),
                             Color(hex: "#FDD835"),
                             Color(hex: "#FF9800"),
                             Color(hex: "#E53935")
@@ -1384,7 +1384,7 @@ struct MonthlyStatsCard: View {
                     title: "Best Day",
                     value: "\(monthStats.best)",
                     subtitle: monthStats.bestDay,
-                    color: Color(hex: "#7BC043"),
+                    color: Color(hex: "#E0E0E0"),
                     icon: "checkmark.circle.fill"
                 )
 
@@ -1402,7 +1402,7 @@ struct MonthlyStatsCard: View {
             let comparison = previousMonthComparison
             HStack {
                 Image(systemName: comparison.isBetter ? "arrow.down.right" : "arrow.up.right")
-                    .foregroundColor(comparison.isBetter ? Color(hex: "#7BC043") : Color(hex: "#FF9800"))
+                    .foregroundColor(comparison.isBetter ? Color(hex: "#E0E0E0") : Color(hex: "#FF9800"))
                 Text("\(comparison.percentage)% \(comparison.isBetter ? "better" : "worse") than \(comparison.previousMonthName)")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.8))
@@ -1639,7 +1639,7 @@ struct CalendarDayCell: View {
 
     var color: Color {
         switch aqi {
-        case 0..<51: return Color(hex: "#7BC043")
+        case 0..<51: return Color(hex: "#E0E0E0")
         case 51..<101: return Color(hex: "#FDD835")
         case 101..<151: return Color(hex: "#FF9800")
         default: return Color(hex: "#E53935")
@@ -1708,7 +1708,7 @@ struct MonthlyTrendGraph: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#7BC043"),
+                            Color(hex: "#E0E0E0"),
                             Color(hex: "#FDD835"),
                             Color(hex: "#FF9800")
                         ],
@@ -1743,7 +1743,7 @@ struct BestDaysInsightCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 InsightRow(
                     icon: "sun.max.fill",
-                    color: "#7BC043",
+                    color: "#E0E0E0",
                     text: "Sundays have 30% better AQI on average"
                 )
 

@@ -834,7 +834,7 @@ struct AQIScaleBar: View {
                     // Background gradient
                     LinearGradient(
                         colors: [
-                            Color(hex: "#7BC043"),
+                            Color(hex: "#E0E0E0"),
                             Color(hex: "#F9A825"),
                             Color(hex: "#FF6F00"),
                             Color(hex: "#E53935"),
@@ -1395,7 +1395,7 @@ struct DayDot: View {
 
     var dotColor: Color {
         switch aqi {
-        case 0..<51: return Color(hex: "#7BC043")
+        case 0..<51: return Color(hex: "#E0E0E0")
         case 51..<101: return Color(hex: "#FDD835")
         case 101..<151: return Color(hex: "#FF9800")
         default: return Color(hex: "#E53935")
@@ -1433,7 +1433,7 @@ struct DailyForecastData: Identifiable {
 
     var aqiColor: Color {
         switch aqi {
-        case 0..<51: return Color(hex: "#7BC043")
+        case 0..<51: return Color(hex: "#E0E0E0")
         case 51..<101: return Color(hex: "#FDD835")
         case 101..<151: return Color(hex: "#FF9800")
         default: return Color(hex: "#E53935")

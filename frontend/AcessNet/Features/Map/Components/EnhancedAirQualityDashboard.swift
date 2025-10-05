@@ -343,7 +343,7 @@ struct EnhancedAirQualityDashboard: View {
                         icon: "checkmark.circle.fill",
                         label: "Good",
                         count: analysis.goodSegments,
-                        color: Color(hex: "#7BC043")
+                        color: Color(hex: "#E0E0E0")
                     )
 
                     StatRow(
@@ -374,7 +374,7 @@ struct EnhancedAirQualityDashboard: View {
                         icon: "leaf.fill",
                         label: "Good",
                         count: stats.goodCount,
-                        color: Color(hex: "#7BC043")
+                        color: Color(hex: "#E0E0E0")
                     )
 
                     StatRow(
@@ -414,7 +414,7 @@ struct EnhancedAirQualityDashboard: View {
                 // Barra de distribución para segmentos de ruta
                 DistributionBar(
                     segments: [
-                        (analysis.goodSegments, Color(hex: "#7BC043")),
+                        (analysis.goodSegments, Color(hex: "#E0E0E0")),
                         (analysis.moderateSegments, Color(hex: "#F9A825")),
                         (analysis.poorSegments, Color(hex: "#FF6F00")),
                         (analysis.unhealthySegments + analysis.severeSegments + analysis.hazardousSegments, Color(hex: "#E53935"))
@@ -426,7 +426,7 @@ struct EnhancedAirQualityDashboard: View {
                 // Barra de distribución para grid (código existente)
                 DistributionBar(
                     segments: [
-                        (stats.goodCount, Color(hex: "#7BC043")),
+                        (stats.goodCount, Color(hex: "#E0E0E0")),
                         (stats.moderateCount, Color(hex: "#F9A825")),
                         (stats.poorCount, Color(hex: "#FF6F00")),
                         (stats.unhealthyCount + stats.severeCount + stats.hazardousCount, Color(hex: "#E53935"))
@@ -701,7 +701,7 @@ struct EnhancedAirQualityDashboard: View {
         // Usar displayLevel que considera tanto ruta como grid
         let level = displayLevel
         switch level {
-        case .good: return Color(hex: "#7BC043")
+        case .good: return Color(hex: "#E0E0E0")
         case .moderate: return Color(hex: "#F9A825")
         case .poor: return Color(hex: "#FF6F00")
         case .unhealthy: return Color(hex: "#E53935")
@@ -726,7 +726,7 @@ struct EnhancedAirQualityDashboard: View {
         var currentPosition: Double = 0
 
         let levels: [(Int, Color)] = [
-            (stats.goodCount, Color(hex: "#7BC043")),
+            (stats.goodCount, Color(hex: "#E0E0E0")),
             (stats.moderateCount, Color(hex: "#F9A825")),
             (stats.poorCount, Color(hex: "#FF6F00")),
             (stats.unhealthyCount + stats.severeCount + stats.hazardousCount, Color(hex: "#E53935"))

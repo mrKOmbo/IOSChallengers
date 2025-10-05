@@ -59,7 +59,7 @@ enum AQILevel: String, CaseIterable {
 
     var color: String {
         switch self {
-        case .good: return "#7BC043"
+        case .good: return "#E0E0E0"
         case .moderate: return "#FDD835" // Amarillo - Estándar AQI para Moderate (51-100)
         case .poor: return "#FF6F00"
         case .unhealthy: return "#E53935"

@@ -385,7 +385,7 @@ struct HeroAirQualityCard: View {
                     ZStack(alignment: .leading) {
                         // Background segments
                         HStack(spacing: 2) {
-                            Rectangle().fill(Color(hex: "#7BC043"))
+                            Rectangle().fill(Color(hex: "#E0E0E0"))
                             Rectangle().fill(Color(hex: "#F9A825"))
                             Rectangle().fill(Color(hex: "#FF6F00"))
                             Rectangle().fill(Color(hex: "#E53935"))

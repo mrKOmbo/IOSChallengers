@@ -24,7 +24,7 @@ struct AirQualityData {
 
         var color: String {
             switch self {
-            case .good: return "#7BC043"
+            case .good: return "#E0E0E0"
             case .moderate: return "#FDD835"
             case .unhealthy: return "#FF9800"
             case .veryUnhealthy: return "#E53935"
