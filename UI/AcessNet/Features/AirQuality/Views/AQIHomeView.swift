@@ -13,6 +13,8 @@ struct AQIHomeView: View {
     @State private var selectedForecastTab: ForecastTab = .hourly
     @State private var showSearchModal = false
     @State private var searchText = ""
+    @State private var realTimeAQI: AirQualityPoint?
+    @State private var isLoadingRealData = false
 
     enum ForecastTab {
         case hourly
@@ -115,7 +117,12 @@ struct AQIHomeView: View {
         }
         .padding(.horizontal)
         .sheet(isPresented: $showSearchModal) {
-            LocationSearchModal(searchText: $searchText)
+            LocationSearchModal(
+                searchText: $searchText,
+                onCitySelected: { airQuality in
+                    updateWithRealData(airQuality)
+                }
+            )
         }
     }
 
@@ -554,6 +561,38 @@ struct AQIHomeView: View {
             )
         ]
     }
+
+    // MARK: - Real Data Integration
+
+    private func updateWithRealData(_ airQuality: AirQualityPoint) {
+        realTimeAQI = airQuality
+
+        print("\n🔄 ===== ACTUALIZANDO AQI HOME VIEW =====")
+        print("   AQI: \(Int(airQuality.aqi))")
+        print("   PM2.5: \(String(format: "%.1f", airQuality.pm25))")
+        print("   Level: \(airQuality.level.rawValue)")
+
+        // Actualizar airQualityData con datos reales
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+            airQualityData = AirQualityData(
+                aqi: Int(airQuality.aqi),
+                pm25: airQuality.pm25,
+                pm10: airQuality.pm10 ?? 0,
+                location: "Selected City",
+                city: "Real Data from Backend",
+                distance: 0.0,
+                temperature: airQualityData.temperature, // Mantener temperatura de muestra
+                humidity: airQualityData.humidity,
+                windSpeed: airQualityData.windSpeed,
+                uvIndex: airQualityData.uvIndex,
+                weatherCondition: airQualityData.weatherCondition,
+                lastUpdate: Date() // Timestamp actual
+            )
+        }
+
+        print("✅ AQI Home View actualizado con datos reales")
+        print("===== END UPDATE =====\n")
+    }
 }
 
 // MARK: - Supporting Views
@@ -986,15 +1025,20 @@ struct SegmentArc: View {
 
 struct LocationSearchModal: View {
     @Binding var searchText: String
+    let onCitySelected: (AirQualityPoint) -> Void
     @Environment(\.dismiss) var dismiss
     @State private var searchResults: [String] = []
+    @State private var isLoading = false
+    @State private var selectedCityAQI: AirQualityPoint?
+    @State private var showAQIDetail = false
 
-    let quickLocations = [
-        ("Mexico City, Mexico", "mappin.circle.fill"),
-        ("New York, USA", "building.2.fill"),
-        ("Tokyo, Japan", "building.fill"),
-        ("London, UK", "building.columns.fill"),
-        ("Paris, France", "sparkles")
+    // Coordenadas de ciudades predefinidas
+    let quickLocations: [(name: String, icon: String, lat: Double, lon: Double)] = [
+        ("Mexico City, Mexico", "mappin.circle.fill", 19.4326, -99.1332),
+        ("New York, USA", "building.2.fill", 40.7128, -74.0060),
+        ("Tokyo, Japan", "building.fill", 35.6762, 139.6503),
+        ("London, UK", "building.columns.fill", 51.5074, -0.1278),
+        ("Paris, France", "sparkles", 48.8566, 2.3522)
     ]
 
     var body: some View {
@@ -1074,24 +1118,35 @@ struct LocationSearchModal: View {
 
                             // Quick location buttons
                             VStack(spacing: 12) {
-                                ForEach(quickLocations, id: \.0) { location in
+                                ForEach(quickLocations, id: \.name) { location in
                                     Button(action: {
-                                        dismiss()
+                                        fetchAirQualityData(for: location)
                                     }) {
                                         HStack(spacing: 16) {
-                                            Image(systemName: location.1)
+                                            Image(systemName: location.icon)
                                                 .font(.title2)
                                                 .foregroundColor(.white)
                                                 .frame(width: 40)
 
                                             VStack(alignment: .leading, spacing: 4) {
-                                                Text(location.0)
+                                                Text(location.name)
                                                     .font(.body.bold())
                                                     .foregroundColor(.white)
 
-                                                Text("View air quality")
-                                                    .font(.caption)
-                                                    .foregroundColor(.white.opacity(0.7))
+                                                if isLoading {
+                                                    HStack(spacing: 6) {
+                                                        ProgressView()
+                                                            .scaleEffect(0.7)
+                                                            .tint(.white)
+                                                        Text("Loading...")
+                                                            .font(.caption)
+                                                            .foregroundColor(.white.opacity(0.7))
+                                                    }
+                                                } else {
+                                                    Text("Tap to view air quality")
+                                                        .font(.caption)
+                                                        .foregroundColor(.white.opacity(0.7))
+                                                }
                                             }
 
                                             Spacer()
@@ -1109,6 +1164,7 @@ struct LocationSearchModal: View {
                                                 )
                                         )
                                     }
+                                    .disabled(isLoading)
                                 }
                             }
                             .padding(.horizontal, 20)
@@ -1178,7 +1234,56 @@ struct LocationSearchModal: View {
             return sampleLocations.filter { $0.lowercased().contains(searchText.lowercased()) }
         }
     }
+
+    // MARK: - Backend Integration
+
+    private func fetchAirQualityData(for location: (name: String, icon: String, lat: Double, lon: Double)) {
+        isLoading = true
+
+        Task {
+            do {
+                print("\n🏙️ ===== AQI HOME VIEW - CIUDAD SELECCIONADA =====")
+                print("📍 Ciudad: \(location.name)")
+                print("   Coordenadas: \(location.lat), \(location.lon)")
+
+                // Consultar backend real
+                let airQuality = try await AirQualityAPIService.shared.getCurrentAQI(
+                    latitude: location.lat,
+                    longitude: location.lon
+                )
+
+                await MainActor.run {
+                    isLoading = false
+                    selectedCityAQI = airQuality
+
+                    print("✅ Datos recibidos - Actualizando vista principal")
+                    print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
+                    print("   PM2.5: \(String(format: "%.1f", airQuality.pm25)) μg/m³")
+                    print("===== END AQI HOME VIEW =====\n")
+
+                    // Llamar callback para actualizar vista principal
+                    onCitySelected(airQuality)
+
+                    // Cerrar modal
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        dismiss()
+                    }
+                }
+
+            } catch {
+                print("\n⚠️ ===== ERROR EN AQI HOME VIEW =====")
+                print("❌ Error: \(error.localizedDescription)")
+                print("===== END ERROR =====\n")
+
+                await MainActor.run {
+                    isLoading = false
+                    // TODO: Mostrar error al usuario
+                }
+            }
+        }
+    }
 }
+
 
 
 // MARK: - Day Comparison Dot

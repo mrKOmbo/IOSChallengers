@@ -38,27 +38,6 @@ struct NavigationPanel: View {
                 eta: navigationState.etaRemaining,
                 averageAQI: navigationState.selectedRoute?.averageAQI
             )
-
-            // Botón para terminar navegación
-            Button(action: onEndNavigation) {
-                HStack {
-                    Image(systemName: "xmark.circle.fill")
-                    Text("Exit Navigation")
-                        .font(.headline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(
-                    LinearGradient(
-                        colors: [Color.red.opacity(0.8), Color.red],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: .red.opacity(0.3), radius: 8, x: 0, y: 4)
-            }
         }
         .padding()
         .background(

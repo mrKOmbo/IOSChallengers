@@ -18,12 +18,12 @@ class AirQualityAPIService {
     /// Instancia singleton
     static let shared = AirQualityAPIService()
 
-    /// Base URL del backend (CAMBIAR POR TU URL)
+    /// Base URL del backend Django
     private var baseURL: String {
         #if DEBUG
-        return "http://localhost:8000/api"  // Local development
+        return "http://localhost:8000/api/v1"  // Local development
         #else
-        return "https://your-backend.com/api"  // Production
+        return "https://your-backend.com/api/v1"  // Production
         #endif
     }
 
@@ -44,6 +44,116 @@ class AirQualityAPIService {
     }
 
     // MARK: - Public Methods
+
+    /// Obtiene la calidad del aire actual de una ubicación desde el backend real
+    /// - Parameters:
+    ///   - latitude: Latitud de la ubicación
+    ///   - longitude: Longitud de la ubicación
+    /// - Returns: Datos de calidad del aire desde OpenAQ
+    func getCurrentAQI(
+        latitude: Double,
+        longitude: Double
+    ) async throws -> AirQualityPoint {
+
+        print("\n🌍 ===== BACKEND REAL API CALL =====")
+        print("📍 Coordenadas: lat=\(latitude), lon=\(longitude)")
+
+        // Construir URL con query parameters
+        var urlComponents = URLComponents(string: baseURL + "/air/current")
+        urlComponents?.queryItems = [
+            URLQueryItem(name: "lat", value: String(latitude)),
+            URLQueryItem(name: "lon", value: String(longitude))
+        ]
+
+        guard let url = urlComponents?.url else {
+            print("❌ Error: URL inválida")
+            throw APIError.invalidURL
+        }
+
+        print("🔗 URL completa: \(url.absoluteString)")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = requestTimeout
+
+        // Realizar request
+        print("⏳ Enviando request al backend Django...")
+        let startTime = Date()
+
+        let (data, response) = try await session.data(for: request)
+
+        let duration = Date().timeIntervalSince(startTime)
+        print("⏱️  Respuesta recibida en \(String(format: "%.2f", duration))s")
+
+        // Validar response HTTP
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Error: Respuesta HTTP inválida")
+            throw APIError.invalidResponse
+        }
+
+        print("📊 Status Code: \(httpResponse.statusCode)")
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("❌ Error del servidor (status \(httpResponse.statusCode))")
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                print("   Mensaje: \(errorResponse.message)")
+                throw APIError.serverError(statusCode: httpResponse.statusCode, message: errorResponse.message)
+            }
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("   Response: \(responseString)")
+            }
+            throw APIError.serverError(statusCode: httpResponse.statusCode, message: "Unknown error")
+        }
+
+        // Log raw JSON response
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 Response JSON:")
+            print(responseString)
+        }
+
+        // Decodificar respuesta del backend Django
+        do {
+            let backendResponse = try JSONDecoder().decode(DjangoAQIResponse.self, from: data)
+
+            print("✅ Decodificación exitosa!")
+            print("   AQI: \(Int(backendResponse.aqi))")
+            print("   Categoría: \(backendResponse.category)")
+            print("   Color: \(backendResponse.color)")
+            print("   Mensaje: \(backendResponse.message)")
+            print("   PM2.5: \(backendResponse.pollutants.pm25 ?? 0)")
+            print("   O3: \(backendResponse.pollutants.o3 ?? 0)")
+            print("   NO2: \(backendResponse.pollutants.no2 ?? 0)")
+
+            // Convertir respuesta del backend a AirQualityPoint
+            let airQualityPoint = AirQualityPoint(
+                coordinate: CLLocationCoordinate2D(
+                    latitude: backendResponse.location.lat,
+                    longitude: backendResponse.location.lon
+                ),
+                aqi: backendResponse.aqi,
+                pm25: backendResponse.pollutants.pm25 ?? 0,
+                pm10: nil,
+                no2: backendResponse.pollutants.no2,
+                o3: backendResponse.pollutants.o3,
+                co: nil,
+                so2: nil,
+                aod: nil,
+                timestamp: Date()
+            )
+
+            print("🎉 AirQualityPoint creado correctamente")
+            print("===== END BACKEND CALL =====\n")
+
+            return airQualityPoint
+
+        } catch {
+            print("❌ Error decodificando respuesta: \(error)")
+            print("   Tipo: \(type(of: error))")
+            print("===== END BACKEND CALL (ERROR) =====\n")
+            throw APIError.decodingError(error)
+        }
+    }
 
     /// Analiza la calidad del aire de una ruta completa
     /// - Parameters:
@@ -255,6 +365,32 @@ struct ErrorResponse: Codable {
     let message: String
     let code: String?
     let details: String?
+}
+
+// MARK: - Django Backend Response Models
+
+/// Respuesta del backend Django para /api/v1/air/current
+struct DjangoAQIResponse: Codable {
+    let location: DjangoLocation
+    let timestamp: String
+    let aqi: Double
+    let category: String
+    let color: String
+    let message: String
+    let pollutants: DjangoPollutants
+}
+
+/// Ubicación en respuesta del backend
+struct DjangoLocation: Codable {
+    let lat: Double
+    let lon: Double
+}
+
+/// Contaminantes en respuesta del backend
+struct DjangoPollutants: Codable {
+    let pm25: Double?
+    let o3: Double?
+    let no2: Double?
 }
 
 // MARK: - Mock Service (for testing without backend)

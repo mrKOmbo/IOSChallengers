@@ -310,6 +310,36 @@ struct EnhancedMapView: View {
                 .transition(.opacity)
             }
 
+            // Botón X para cancelar navegación o limpiar ruta (top left)
+            if isInNavigationMode || hasActiveRoute {
+                VStack {
+                    HStack {
+                        Button(action: {
+                            if isInNavigationMode {
+                                stopNavigation()
+                            } else {
+                                clearRoute()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Circle()
+                                        .fill(Color.red.opacity(0.9))
+                                        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                                )
+                        }
+                        .padding(.leading, 16)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .padding(.top, 60)
+                .transition(.scale.combined(with: .opacity))
+            }
+
             // Controles superiores: barra de búsqueda (ocultar cuando hay ruta activa)
             if !hasActiveRoute {
                 VStack(alignment: .leading, spacing: 0) {
