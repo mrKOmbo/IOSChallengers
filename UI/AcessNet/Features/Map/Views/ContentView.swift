@@ -119,14 +119,25 @@ struct EnhancedMapView: View {
         }
 
         guard appSettings.enableProximityFiltering else {
+            print("📍 Proximity Filtering DISABLED - Showing all \(airQualityGridManager.zones.count) zones")
             return airQualityGridManager.zones
         }
 
-        return ProximityFilter.filterZones(
+        let filtered = ProximityFilter.filterZones(
             airQualityGridManager.zones,
             from: userLocation,
             maxRadius: appSettings.proximityRadiusMeters
         )
+
+        // Debug logging
+        let stats = ProximityFilter.calculateStatistics(
+            total: airQualityGridManager.zones,
+            visible: filtered,
+            radius: appSettings.proximityRadiusMeters
+        )
+        ProximityFilter.logFilterStatistics(stats, elementType: "Air Quality Zones")
+
+        return filtered
     }
 
     /// Alerts dentro del rango de visibilidad (10km)
@@ -139,11 +150,23 @@ struct EnhancedMapView: View {
             return annotations
         }
 
-        return ProximityFilter.filterAnnotations(
+        let filtered = ProximityFilter.filterAnnotations(
             annotations,
             from: userLocation,
             maxRadius: appSettings.proximityRadiusMeters
         )
+
+        // Debug logging
+        if !annotations.isEmpty {
+            let stats = ProximityFilter.calculateStatistics(
+                total: annotations,
+                visible: filtered,
+                radius: appSettings.proximityRadiusMeters
+            )
+            ProximityFilter.logFilterStatistics(stats, elementType: "Alert Annotations")
+        }
+
+        return filtered
     }
 
     /// Route arrows dentro del rango de visibilidad (10km)
@@ -156,11 +179,23 @@ struct EnhancedMapView: View {
             return routeArrows
         }
 
-        return ProximityFilter.filterRouteArrows(
+        let filtered = ProximityFilter.filterRouteArrows(
             routeArrows,
             from: userLocation,
             maxRadius: appSettings.proximityRadiusMeters
         )
+
+        // Debug logging
+        if !routeArrows.isEmpty {
+            let stats = ProximityFilter.calculateStatistics(
+                total: routeArrows,
+                visible: filtered,
+                radius: appSettings.proximityRadiusMeters
+            )
+            ProximityFilter.logFilterStatistics(stats, elementType: "Route Arrows")
+        }
+
+        return filtered
     }
 
     var body: some View {

@@ -116,9 +116,6 @@ struct AnimatedAtmosphericBlob: View {
             }
         }
         .frame(width: 80, height: 80)
-        .onAppear {
-            print("🎨 [StaticAirQualityCircle] onAppear - zone: \(zone.level)")
-        }
     }
 
     // MARK: - Computed Properties
