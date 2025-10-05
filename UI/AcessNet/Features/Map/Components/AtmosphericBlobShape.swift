@@ -130,49 +130,22 @@ struct AnimatedAtmosphericBlob: View {
 
 // MARK: - Enhanced Cloud Overlay (Reemplazo de MapCircle)
 
-/// Vista mejorada para overlay de zona en el mapa
-/// Conectada con AppSettings para control de performance
+/// Vista optimizada para overlay de zona en el mapa
+/// SIN animaciones para máximo rendimiento
 struct EnhancedAirQualityOverlay: View {
     let zone: AirQualityZone
     let isVisible: Bool
     let index: Int
-    let settingsKey: String  // Clave única para forzar recreación cuando cambien settings
+    let settingsKey: String
 
     @EnvironmentObject var appSettings: AppSettings
 
-    @State private var scale: CGFloat = 0.0
-    @State private var opacity: Double = 0.0
-
     var body: some View {
-        let _ = print("🏗️ [EnhancedAirQualityOverlay] body rendering - settingsKey: \(settingsKey), index: \(index)")
-
-        return AnimatedAtmosphericBlob(
+        AnimatedAtmosphericBlob(
             zone: zone,
             enableRotation: appSettings.enableAirQualityRotation
         )
-        .id(settingsKey) // Forzar recreación cuando cambien settings
-        .scaleEffect(scale)
-        .opacity(opacity)
-        .onAppear {
-            print("✨ [EnhancedAirQualityOverlay] onAppear - index: \(index), settingsKey: \(settingsKey)")
-            // Stagger animation basado en index
-            let delay = Double(index) * 0.05
-
-            withAnimation(
-                .spring(response: 0.6, dampingFraction: 0.7)
-                .delay(delay)
-            ) {
-                scale = 1.0
-                opacity = 1.0
-            }
-        }
-        .onChange(of: isVisible) { _, newValue in
-            print("👁️ [EnhancedAirQualityOverlay] onChange isVisible: \(newValue), index: \(index)")
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                scale = newValue ? 1.0 : 0.0
-                opacity = newValue ? 1.0 : 0.0
-            }
-        }
+        .id(settingsKey)
     }
 }
 

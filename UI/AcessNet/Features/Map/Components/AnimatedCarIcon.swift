@@ -13,13 +13,11 @@ struct AnimatedCarIcon: View {
     let isMoving: Bool
     let showPulse: Bool
 
-    @State private var rotationAnimate = false
     @State private var pulseAnimate = false
-    @State private var breatheScale: CGFloat = 1.0
 
     var body: some View {
         ZStack {
-            // Pulse effect cuando está en modo Business (más sutil)
+            // Pulse effect cuando está en modo Business (ÚNICA ANIMACIÓN FOREVER)
             if showPulse {
                 ForEach(0..<2) { index in
                     Circle()
@@ -43,7 +41,7 @@ struct AnimatedCarIcon: View {
                 }
             }
 
-            // Shadow circular para profundidad mejorado
+            // Shadow circular para profundidad (blur reducido)
             Circle()
                 .fill(
                     RadialGradient(
@@ -58,7 +56,7 @@ struct AnimatedCarIcon: View {
                     )
                 )
                 .frame(width: 70, height: 70)
-                .blur(radius: 5)
+                .blur(radius: 2)
 
             // Icono del auto con glassmorphism
             ZStack {
@@ -94,7 +92,7 @@ struct AnimatedCarIcon: View {
                     )
                     .frame(width: 54, height: 54)
 
-                // Icono del auto
+                // Icono del auto (estático, sin breathing animation)
                 Image(systemName: isMoving ? "car.fill" : "car")
                     .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(
@@ -108,58 +106,13 @@ struct AnimatedCarIcon: View {
                     .rotationEffect(.degrees(heading))
                     .animation(.spring(response: 0.4, dampingFraction: 0.75), value: heading)
             }
-            .scaleEffect(breatheScale)
-
-            // Indicador de movimiento (anillo rotatorio mejorado)
-            if isMoving {
-                Circle()
-                    .trim(from: 0, to: 0.25)
-                    .stroke(
-                        AngularGradient(
-                            colors: [
-                                .cyan.opacity(0.9),
-                                .blue.opacity(0.8),
-                                .cyan.opacity(0.9)
-                            ],
-                            center: .center
-                        ),
-                        style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
-                    )
-                    .frame(width: 66, height: 66)
-                    .rotationEffect(.degrees(rotationAnimate ? 360 : 0))
-
-                // Segundo anillo en dirección opuesta
-                Circle()
-                    .trim(from: 0, to: 0.15)
-                    .stroke(
-                        .white.opacity(0.4),
-                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-                    )
-                    .frame(width: 66, height: 66)
-                    .rotationEffect(.degrees(rotationAnimate ? -360 : 0))
-            }
         }
         .onAppear {
-            // Animación de rotación del anillo
-            if isMoving {
-                withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
-                    rotationAnimate = true
-                }
-            }
-
-            // Animación de pulso
+            // SOLO animación de pulso (cuando showPulse=true)
             if showPulse {
                 withAnimation {
                     pulseAnimate = true
                 }
-            }
-
-            // Animación de respiración sutil
-            withAnimation(
-                .easeInOut(duration: 2.0)
-                .repeatForever(autoreverses: true)
-            ) {
-                breatheScale = 1.06
             }
         }
     }

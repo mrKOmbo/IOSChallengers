@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreLocation
 
 /// Gestor centralizado de configuraciones de la app con persistencia
 class AppSettings: ObservableObject {
@@ -35,6 +36,32 @@ class AppSettings: ObservableObject {
     @AppStorage("airQualityGridSize")
     var airQualityGridSize: Int = 5
 
+    // MARK: - Proximity Filtering Settings
+
+    /// Habilita filtrado por proximidad para elementos del mapa
+    /// - Impacto en rendimiento: ALTO (reduce elementos renderizados hasta 50%)
+    /// - Default: true (activado para mejor performance)
+    @AppStorage("enableProximityFiltering")
+    var enableProximityFiltering: Bool = true {
+        willSet {
+            objectWillChange.send()
+        }
+    }
+
+    /// Radio de proximidad en kilómetros (5-20km)
+    /// Define qué tan lejos del usuario se muestran elementos
+    @AppStorage("proximityRadiusKm")
+    var proximityRadiusKm: Double = 10.0 {
+        willSet {
+            objectWillChange.send()
+        }
+    }
+
+    /// Radio de proximidad en metros (computed)
+    var proximityRadiusMeters: CLLocationDistance {
+        return proximityRadiusKm * 1000
+    }
+
     // MARK: - General Preferences
 
     /// Unidad de distancia preferida
@@ -58,6 +85,8 @@ class AppSettings: ObservableObject {
     func resetToDefaults() {
         enableAirQualityRotation = true
         airQualityGridSize = 5
+        enableProximityFiltering = true
+        proximityRadiusKm = 10.0
         useMetricUnits = true
         enableSmartNotifications = false
 

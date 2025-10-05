@@ -110,6 +110,59 @@ struct EnhancedMapView: View {
         routeManager.currentRoute != nil || routeManager.isCalculating
     }
 
+    // MARK: - Proximity Filtering (10km Radius)
+
+    /// Zonas de calidad del aire dentro del rango de visibilidad (10km)
+    private var visibleAirQualityZones: [AirQualityZone] {
+        guard let userLocation = locationManager.userLocation else {
+            return airQualityGridManager.zones
+        }
+
+        guard appSettings.enableProximityFiltering else {
+            return airQualityGridManager.zones
+        }
+
+        return ProximityFilter.filterZones(
+            airQualityGridManager.zones,
+            from: userLocation,
+            maxRadius: appSettings.proximityRadiusMeters
+        )
+    }
+
+    /// Alerts dentro del rango de visibilidad (10km)
+    private var visibleAnnotations: [CustomAnnotation] {
+        guard let userLocation = locationManager.userLocation else {
+            return annotations
+        }
+
+        guard appSettings.enableProximityFiltering else {
+            return annotations
+        }
+
+        return ProximityFilter.filterAnnotations(
+            annotations,
+            from: userLocation,
+            maxRadius: appSettings.proximityRadiusMeters
+        )
+    }
+
+    /// Route arrows dentro del rango de visibilidad (10km)
+    private var visibleRouteArrows: [RouteArrowAnnotation] {
+        guard let userLocation = locationManager.userLocation else {
+            return routeArrows
+        }
+
+        guard appSettings.enableProximityFiltering else {
+            return routeArrows
+        }
+
+        return ProximityFilter.filterRouteArrows(
+            routeArrows,
+            from: userLocation,
+            maxRadius: appSettings.proximityRadiusMeters
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Mapa principal mejorado
@@ -449,18 +502,16 @@ struct EnhancedMapView: View {
                             isMoving: locationManager.isMoving,
                             showPulse: showPulse
                         )
-                        .bounceIn()
                     }
                 }
 
-                // Alert annotations
-                ForEach(annotations) { annotation in
+                // Alert annotations (filtradas por proximidad)
+                ForEach(visibleAnnotations) { annotation in
                     Annotation(annotation.title, coordinate: annotation.coordinate) {
                         AlertAnnotationView(
                             alertType: annotation.alertType,
                             showPulse: true
                         )
-                        .bounceIn()
                         .onTapGesture {
                             selectedAnnotation = annotation
                         }
@@ -471,7 +522,6 @@ struct EnhancedMapView: View {
                 if let dest = destination {
                     Annotation(dest.title, coordinate: dest.coordinate) {
                         DestinationAnnotationView()
-                            .bounceIn()
                             .onTapGesture {
                                 // Opcional: mostrar detalles del destino
                             }
@@ -527,15 +577,14 @@ struct EnhancedMapView: View {
                         )
                 }
 
-                // Directional arrows along route
-                ForEach(Array(routeArrows.enumerated()), id: \.element.id) { index, arrow in
+                // Directional arrows along route (filtradas por proximidad)
+                ForEach(Array(visibleRouteArrows.enumerated()), id: \.element.id) { index, arrow in
                     Annotation("", coordinate: arrow.coordinate) {
                         DirectionalArrowView(
                             heading: arrow.heading,
                             isNext: index == 0, // Primera flecha es la siguiente
                             size: 30
                         )
-                        .bounceIn()
                     }
                     .annotationTitles(.hidden)
                 }
@@ -548,16 +597,15 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // 🌍 AIR QUALITY ZONES OVERLAY - Enhanced with Atmospheric Blobs
+                // 🌍 AIR QUALITY ZONES OVERLAY - Optimized (Proximity Filtered + Static)
                 if showAirQualityLayer {
-                    ForEach(Array(airQualityGridManager.zones.enumerated()), id: \.element.id) { index, zone in
-                        // MapCircle de fondo para cobertura de área
+                    ForEach(Array(visibleAirQualityZones.enumerated()), id: \.element.id) { index, zone in
+                        // MapCircle estático para mostrar área de cobertura (500m radius)
                         MapCircle(center: zone.coordinate, radius: zone.radius)
                             .foregroundStyle(zone.fillColor)
                             .stroke(zone.strokeColor, lineWidth: 0.5)
 
-                        // Atmospheric Blob mejorado (todas las zonas)
-                        // Key insight: Recrear vista cuando cambien settings de performance
+                        // Annotation estático con icono central (sin animaciones)
                         Annotation("", coordinate: zone.coordinate) {
                             EnhancedAirQualityOverlay(
                                 zone: zone,
