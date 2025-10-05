@@ -87,55 +87,60 @@ struct AnimatedAtmosphericBlob: View {
 
     var body: some View {
         ZStack {
-            // Capa 1: Glow exterior (blur optimizado: 12→6)
-            AtmosphericBlobShape(irregularity: 0.2, phase: breathingPhase)
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            zone.color.opacity(0.4),
-                            zone.color.opacity(0.2),
-                            zone.color.opacity(0.05),
-                            .clear
-                        ],
-                        center: .center,
-                        startRadius: 20,
-                        endRadius: 60
+            // Blob animado (breathing + rotation)
+            ZStack {
+                // Capa 1: Glow exterior (blur optimizado: 12→6)
+                AtmosphericBlobShape(irregularity: 0.2, phase: breathingPhase)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                zone.color.opacity(0.4),
+                                zone.color.opacity(0.2),
+                                zone.color.opacity(0.05),
+                                .clear
+                            ],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 60
+                        )
                     )
-                )
-                .blur(radius: 6)
-                .scaleEffect(1.3)
+                    .blur(radius: 6)
+                    .scaleEffect(1.3)
 
-            // Capa 2: Blob principal con gradiente mesh (blur optimizado: 3→1.5)
-            AtmosphericBlobShape(irregularity: 0.25, phase: breathingPhase)
-                .fill(
-                    EllipticalGradient(
-                        colors: [
-                            zone.color.opacity(zone.fillOpacity * 1.2),
-                            zone.color.opacity(zone.fillOpacity * 0.9),
-                            zone.color.opacity(zone.fillOpacity * 0.6),
-                            zone.color.opacity(zone.fillOpacity * 0.3)
-                        ],
-                        center: .center,
-                        startRadiusFraction: 0,
-                        endRadiusFraction: 0.8
+                // Capa 2: Blob principal con gradiente mesh (blur optimizado: 3→1.5)
+                AtmosphericBlobShape(irregularity: 0.25, phase: breathingPhase)
+                    .fill(
+                        EllipticalGradient(
+                            colors: [
+                                zone.color.opacity(zone.fillOpacity * 1.2),
+                                zone.color.opacity(zone.fillOpacity * 0.9),
+                                zone.color.opacity(zone.fillOpacity * 0.6),
+                                zone.color.opacity(zone.fillOpacity * 0.3)
+                            ],
+                            center: .center,
+                            startRadiusFraction: 0,
+                            endRadiusFraction: 0.8
+                        )
                     )
-                )
-                .blur(radius: 1.5)
+                    .blur(radius: 1.5)
 
-            // Capa 3: Contorno con trazo irregular (blur eliminado para performance)
-            AtmosphericBlobShape(irregularity: 0.3, phase: breathingPhase)
-                .stroke(
-                    zone.color.opacity(0.5),
-                    style: StrokeStyle(
-                        lineWidth: 2,
-                        lineCap: .round,
-                        lineJoin: .round,
-                        dash: [8, 4],
-                        dashPhase: breathingPhase * 10
+                // Capa 3: Contorno con trazo irregular (blur eliminado para performance)
+                AtmosphericBlobShape(irregularity: 0.3, phase: breathingPhase)
+                    .stroke(
+                        zone.color.opacity(0.5),
+                        style: StrokeStyle(
+                            lineWidth: 2,
+                            lineCap: .round,
+                            lineJoin: .round,
+                            dash: [8, 4],
+                            dashPhase: breathingPhase * 10
+                        )
                     )
-                )
+            }
+            .frame(width: 80, height: 80)
+            .rotationEffect(.degrees(enableRotation ? rotationAngle : 0))
 
-            // Capa 4: Icono central (solo para zonas malas)
+            // Icono central ESTÁTICO (sin animaciones)
             if shouldShowIcon {
                 ZStack {
                     Circle()
@@ -150,7 +155,6 @@ struct AnimatedAtmosphericBlob: View {
             }
         }
         .frame(width: 80, height: 80)
-        .rotationEffect(.degrees(enableRotation ? rotationAngle : 0))
         .onAppear {
             startBreathingAnimation()
             if enableRotation {
