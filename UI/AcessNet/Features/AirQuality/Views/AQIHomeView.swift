@@ -13,75 +13,28 @@ struct AQIHomeView: View {
     @State private var selectedForecastTab: ForecastTab = .hourly
     @State private var showSearchModal = false
     @State private var searchText = ""
-    @State private var isMenuOpen = false
 
     enum ForecastTab {
         case hourly
         case daily
     }
 
-    private let menuWidth: CGFloat = 280
-
     init(showBusinessPulse: Binding<Bool>) {
         self._showBusinessPulse = showBusinessPulse
     }
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Side menu ahora vive en la vista de inicio
-            SideMenuView(onBusinessToggle: { isActive in
-                showBusinessPulse = isActive
-            })
-            .frame(width: menuWidth)
-            .offset(x: isMenuOpen ? 0 : -menuWidth)
-
-            mainContent
-                .cornerRadius(isMenuOpen ? 20 : 0)
-                .scaleEffect(isMenuOpen ? 0.82 : 1)
-                .offset(x: isMenuOpen ? menuWidth : 0)
-                .shadow(color: .black.opacity(isMenuOpen ? 0.25 : 0), radius: 10)
-                .disabled(isMenuOpen)
-                .overlay(
-                    Color.black.opacity(isMenuOpen ? 0.2 : 0)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-                )
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isMenuOpen)
-        .ignoresSafeArea()
-    }
-
-    private var mainContent: some View {
         NavigationView {
             ZStack {
-                // Background gradient based on AQI level - More vibrant with multiple layers
-                ZStack {
-                    // Base gradient
-                    LinearGradient(
-                        colors: [
-                            Color(hex: airQualityData.qualityLevel.backgroundColor),
-                            Color(hex: airQualityData.qualityLevel.backgroundColor).opacity(0.7),
-                            Color(hex: airQualityData.qualityLevel.color).opacity(0.5)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-
-                    // Overlay gradient for depth
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.1),
-                            Color.clear,
-                            Color.black.opacity(0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-
-                    // Animated rain effect
-                    RainEffectView()
-                        .opacity(0.6)
-                }
+                // Background gradient - Primary to Secondary
+                LinearGradient(
+                    colors: [
+                        Color("Primary"),
+                        Color("Secondary")
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
                 .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
@@ -95,59 +48,14 @@ struct AQIHomeView: View {
                         // Weather Info Card
                         weatherCard
 
-                        // Mascot Character
-                        mascotView
+                        // Today's Exposure
+                        todaysExposureView
 
                         // Weather Forecast
                         weatherForecast
                     }
                     .padding(.top, 20)
                     .avoidTabBar(extraPadding: 20)
-                }
-
-
-                // "Near Me?" floating button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {}) {
-                            VStack(spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [.green, .yellow, .orange, .red],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .frame(width: 20, height: 20)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(.white, lineWidth: 1.5)
-                                        )
-
-                                    Text("AQI")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .foregroundColor(.white)
-                                }
-
-                                Text("Near Me?")
-                                    .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .fill(Color("Primary"))
-                                    .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
-                            )
-                        }
-                        .padding(.trailing, 20)
-                        .aboveTabBar(extraPadding: 20)
-                    }
                 }
             }
             .navigationBarHidden(true)
@@ -159,22 +67,7 @@ struct AQIHomeView: View {
 
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 16) {
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                        isMenuOpen.toggle()
-                    }
-                }) {
-                    Image(systemName: isMenuOpen ? "xmark" : "line.3.horizontal")
-                        .font(.title2.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(10)
-                        .background(Color.white.opacity(0.15))
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
-                }
-                .accessibilityLabel("Abrir menú lateral")
-
+            HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
                         Image(systemName: "location.fill")
@@ -321,7 +214,7 @@ struct AQIHomeView: View {
         NavigationLink(destination: DailyForecastView()) {
             VStack(spacing: 16) {
                 // AQI Card content
-                HStack(alignment: .top) {
+                HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Circle()
@@ -366,26 +259,36 @@ struct AQIHomeView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
 
-                // PM Indicators
-                HStack(spacing: 24) {
-                    // PM2.5 - Simplified
-                    HStack(spacing: 8) {
-                        Text("PM2.5:")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.9))
+                // PM Indicators with daily comparison
+                HStack(spacing: 20) {
+                    // PM2.5
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("PM2.5")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+
                         Text("\(Int(airQualityData.pm25)) μg/m³")
                             .font(.subheadline.bold())
                             .foregroundColor(.white)
                     }
 
-                    // PM10 - Simplified
-                    HStack(spacing: 8) {
-                        Text("PM10:")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.9))
+                    // PM10
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("PM10")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+
                         Text("\(Int(airQualityData.pm10)) μg/m³")
                             .font(.subheadline.bold())
                             .foregroundColor(.white)
+                    }
+
+                    Spacer()
+
+                    // Daily comparison dots
+                    HStack(spacing: 8) {
+                        DayDot(label: "Tue", aqi: 52)
+                        DayDot(label: "Wed", aqi: 58)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -503,6 +406,20 @@ struct AQIHomeView: View {
         }
     }
 
+    private var todaysExposureView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Today's exposure")
+                .font(.title2.bold())
+                .foregroundColor(.white)
+                .padding(.horizontal)
+
+            // Exposure Chart
+            ExposureCircularChart()
+                .frame(height: 280)
+                .padding(.horizontal)
+        }
+    }
+
     private var mascotView: some View {
         HStack {
             Spacer()
@@ -526,14 +443,18 @@ struct AQIHomeView: View {
                     title: "Hourly",
                     isSelected: selectedForecastTab == .hourly
                 ) {
-                    selectedForecastTab = .hourly
+                    withAnimation(.none) {
+                        selectedForecastTab = .hourly
+                    }
                 }
 
                 ForecastTabButton(
                     title: "Daily",
                     isSelected: selectedForecastTab == .daily
                 ) {
-                    selectedForecastTab = .daily
+                    withAnimation(.none) {
+                        selectedForecastTab = .daily
+                    }
                 }
             }
             .padding(.horizontal)
@@ -541,35 +462,10 @@ struct AQIHomeView: View {
             // Forecast content with sample data
             if selectedForecastTab == .hourly {
                 hourlyForecastView
+                    .transition(.identity)
             } else {
-                // Daily forecast navigation button
-                NavigationLink(destination: DailyForecastView()) {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar")
-                            .font(.system(size: 50))
-                            .foregroundColor(.white.opacity(0.6))
-
-                        Text("View Daily Forecast")
-                            .font(.headline)
-                            .foregroundColor(.white)
-
-                        Text("Tap to see 5-day forecast")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(.ultraThinMaterial.opacity(0.3))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(.white.opacity(0.2), lineWidth: 1)
-                            )
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                    )
-                }
-                .padding(.horizontal)
+                dailyForecastView
+                    .transition(.identity)
             }
         }
     }
@@ -587,6 +483,76 @@ struct AQIHomeView: View {
             }
             .padding(.horizontal)
         }
+    }
+
+    private var dailyForecastView: some View {
+        VStack(spacing: 16) {
+            // Daily forecast cards
+            ForEach(generateDailyForecasts()) { forecast in
+                NavigationLink(destination: DailyForecastView()) {
+                    DailyForecastCard(forecast: forecast)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func generateDailyForecasts() -> [DailyForecastData] {
+        let calendar = Calendar.current
+        let today = Date()
+
+        return [
+            DailyForecastData(
+                id: 0,
+                date: calendar.date(byAdding: .day, value: 0, to: today)!,
+                dayName: "Today",
+                aqi: 58,
+                temp: 16,
+                weatherIcon: "cloud.rain.fill",
+                weatherDescription: "Rainy",
+                qualityLevel: "Moderate"
+            ),
+            DailyForecastData(
+                id: 1,
+                date: calendar.date(byAdding: .day, value: 1, to: today)!,
+                dayName: "Tomorrow",
+                aqi: 45,
+                temp: 17,
+                weatherIcon: "cloud.sun.fill",
+                weatherDescription: "Partly Cloudy",
+                qualityLevel: "Good"
+            ),
+            DailyForecastData(
+                id: 2,
+                date: calendar.date(byAdding: .day, value: 2, to: today)!,
+                dayName: "Saturday",
+                aqi: 62,
+                temp: 18,
+                weatherIcon: "cloud.fill",
+                weatherDescription: "Cloudy",
+                qualityLevel: "Moderate"
+            ),
+            DailyForecastData(
+                id: 3,
+                date: calendar.date(byAdding: .day, value: 3, to: today)!,
+                dayName: "Sunday",
+                aqi: 38,
+                temp: 19,
+                weatherIcon: "sun.max.fill",
+                weatherDescription: "Sunny",
+                qualityLevel: "Good"
+            ),
+            DailyForecastData(
+                id: 4,
+                date: calendar.date(byAdding: .day, value: 4, to: today)!,
+                dayName: "Monday",
+                aqi: 71,
+                temp: 15,
+                weatherIcon: "cloud.drizzle.fill",
+                weatherDescription: "Drizzle",
+                qualityLevel: "Moderate"
+            )
+        ]
     }
 }
 
@@ -791,32 +757,228 @@ struct HourlyForecastItem: View {
     }
 }
 
-// MARK: - Color Extension
+// MARK: - Exposure Circular Chart
 
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
+struct ExposureCircularChart: View {
+    @State private var selectedCategory = "All"
+    let categories = ["All", "Home", "Work", "Outdoor"]
+
+    // Sample data: hours spent in each environment (today's data)
+    let homeHours: CGFloat = 6
+    let workHours: CGFloat = 4
+    let outdoorHours: CGFloat = 3
+
+    var totalHours: CGFloat {
+        homeHours + workHours + outdoorHours
+    }
+
+    var showHome: Bool {
+        selectedCategory == "All" || selectedCategory == "Home"
+    }
+
+    var showWork: Bool {
+        selectedCategory == "All" || selectedCategory == "Work"
+    }
+
+    var showOutdoor: Bool {
+        selectedCategory == "All" || selectedCategory == "Outdoor"
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Category tabs
+            HStack(spacing: 12) {
+                ForEach(categories, id: \.self) { category in
+                    ExposureCategoryTabHome(
+                        title: category,
+                        isSelected: selectedCategory == category
+                    ) {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedCategory = category
+                        }
+                    }
+                }
+            }
+
+            // Circular clock-style chart
+            ZStack {
+                // Hour markers and labels
+                ForEach(0..<24) { hour in
+                    HourMarker(hour: hour, totalHours: totalHours)
+                }
+
+                // Colored segments - conditional display with animations
+                ZStack {
+                    // Home segment (Yellow)
+                    if showHome {
+                        SegmentArc(
+                            startHour: 0,
+                            endHour: homeHours,
+                            color: Color(hex: "#FFD54F"),
+                            label: "HOME",
+                            hours: homeHours
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                    }
+
+                    // Work segment (Green)
+                    if showWork {
+                        SegmentArc(
+                            startHour: homeHours,
+                            endHour: homeHours + workHours,
+                            color: Color(hex: "#81C784"),
+                            label: "WORK",
+                            hours: workHours
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                    }
+
+                    // Outdoor segment (Orange)
+                    if showOutdoor {
+                        SegmentArc(
+                            startHour: homeHours + workHours,
+                            endHour: homeHours + workHours + outdoorHours,
+                            color: Color(hex: "#FFA726"),
+                            label: "OUTDOOR",
+                            hours: outdoorHours
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                }
+
+                // Center content
+                VStack(spacing: 8) {
+                    if selectedCategory == "All" {
+                        Image(systemName: "figure.stand")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.3))
+
+                        Text("\(Int(totalHours))h")
+                            .font(.title3.bold())
+                            .foregroundColor(.white.opacity(0.6))
+
+                        Text("Total")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                    } else {
+                        let hours = selectedCategory == "Home" ? homeHours :
+                                   selectedCategory == "Work" ? workHours : outdoorHours
+
+                        Text("\(Int(hours))h")
+                            .font(.system(size: 48, weight: .heavy))
+                            .foregroundColor(.white)
+
+                        Text(selectedCategory.uppercased())
+                            .font(.caption.bold())
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+            }
+            .frame(height: 240)
         }
+    }
+}
 
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
+struct ExposureCategoryTabHome: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var categoryColor: Color {
+        switch title {
+        case "Home": return Color(hex: "#FFD54F")
+        case "Work": return Color(hex: "#81C784")
+        case "Outdoor": return Color(hex: "#FFA726")
+        default: return .white
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.bold())
+                .foregroundColor(isSelected ? .white : .white.opacity(0.7))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(isSelected ? categoryColor.opacity(0.3) : Color.white.opacity(0.15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(isSelected ? categoryColor : .clear, lineWidth: 2)
+                        )
+                )
+        }
+    }
+}
+
+struct CategoryTab: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.bold())
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(isSelected ? Color.blue : Color.white.opacity(0.2))
+                )
+        }
+    }
+}
+
+struct HourMarker: View {
+    let hour: Int
+    let totalHours: CGFloat
+
+    var body: some View {
+        VStack {
+            Rectangle()
+                .fill(.white.opacity(0.3))
+                .frame(width: hour % 3 == 0 ? 2 : 1, height: hour % 3 == 0 ? 12 : 6)
+
+            Spacer()
+
+            if hour % 3 == 0 {
+                Text("\(hour)")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.6))
+                    .offset(y: -10)
+            }
+        }
+        .frame(width: 100, height: 100)
+        .rotationEffect(.degrees(Double(hour) * 15))
+    }
+}
+
+struct SegmentArc: View {
+    let startHour: CGFloat
+    let endHour: CGFloat
+    let color: Color
+    let label: String
+    let hours: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .trim(from: startHour / 24, to: endHour / 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.7)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    lineWidth: 35
+                )
+                .frame(width: 180, height: 180)
+                .rotationEffect(.degrees(-90))
+                .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 0)
+        }
     }
 }
 
@@ -837,8 +999,17 @@ struct LocationSearchModal: View {
 
     var body: some View {
         ZStack {
-            Color("Body")
-                .ignoresSafeArea()
+            // Background gradient - Using app colors
+            LinearGradient(
+                colors: [
+                    Color("Secondary"),
+                    Color("Primary"),
+                    Color("Secondary")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header with close button
@@ -1009,6 +1180,144 @@ struct LocationSearchModal: View {
     }
 }
 
+
+// MARK: - Day Comparison Dot
+
+struct DayDot: View {
+    let label: String
+    let aqi: Int
+
+    var dotColor: Color {
+        switch aqi {
+        case 0..<51: return Color(hex: "#7BC043")
+        case 51..<101: return Color(hex: "#FDD835")
+        case 101..<151: return Color(hex: "#FF9800")
+        default: return Color(hex: "#E53935")
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Circle()
+                .fill(dotColor)
+                .frame(width: 12, height: 12)
+                .overlay(
+                    Circle()
+                        .stroke(.white.opacity(0.4), lineWidth: 1)
+                )
+
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
+        }
+    }
+}
+
+// MARK: - Daily Forecast Data Model
+
+struct DailyForecastData: Identifiable {
+    let id: Int
+    let date: Date
+    let dayName: String
+    let aqi: Int
+    let temp: Int
+    let weatherIcon: String
+    let weatherDescription: String
+    let qualityLevel: String
+
+    var aqiColor: Color {
+        switch aqi {
+        case 0..<51: return Color(hex: "#7BC043")
+        case 51..<101: return Color(hex: "#FDD835")
+        case 101..<151: return Color(hex: "#FF9800")
+        default: return Color(hex: "#E53935")
+        }
+    }
+}
+
+struct DailyForecastCard: View {
+    let forecast: DailyForecastData
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // Left section - Day and Date
+            VStack(alignment: .leading, spacing: 4) {
+                Text(forecast.dayName)
+                    .font(.headline)
+                    .foregroundColor(.white)
+
+                Text(formatDate(forecast.date))
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(width: 85, alignment: .leading)
+
+            // AQI Badge
+            VStack(spacing: 4) {
+                Text("\(forecast.aqi)")
+                    .font(.title2.bold())
+                    .foregroundColor(.white)
+
+                Text("AQI")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(forecast.aqiColor.opacity(0.3))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(forecast.aqiColor, lineWidth: 2)
+                    )
+            )
+
+            Spacer()
+
+            // Weather section
+            HStack(spacing: 12) {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(forecast.weatherDescription)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+
+                    Text("\(forecast.temp)°C")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+
+                Image(systemName: forecast.weatherIcon)
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .symbolRenderingMode(.multicolor)
+                    .frame(width: 35)
+            }
+
+            // Chevron
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.4))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial.opacity(0.3))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        )
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+}
 
 // MARK: - Preview
 
