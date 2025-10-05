@@ -48,10 +48,10 @@ class AppSettings: ObservableObject {
         }
     }
 
-    /// Radio de proximidad en kilómetros (5-20km)
+    /// Radio de proximidad en kilómetros (1-5km)
     /// Define qué tan lejos del usuario se muestran elementos
     @AppStorage("proximityRadiusKm")
-    var proximityRadiusKm: Double = 10.0 {
+    var proximityRadiusKm: Double = 2.0 {
         willSet {
             objectWillChange.send()
         }
@@ -86,7 +86,7 @@ class AppSettings: ObservableObject {
         enableAirQualityRotation = true
         airQualityGridSize = 5
         enableProximityFiltering = true
-        proximityRadiusKm = 10.0
+        proximityRadiusKm = 2.0
         useMetricUnits = true
         enableSmartNotifications = false
 

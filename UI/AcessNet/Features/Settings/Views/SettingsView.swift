@@ -136,19 +136,19 @@ struct SettingsView: View {
 
                                 Slider(
                                     value: $appSettings.proximityRadiusKm,
-                                    in: 5...20,
-                                    step: 1
+                                    in: 1...5,
+                                    step: 0.5
                                 )
                                 .tint(Color("AccentColor"))
 
                                 HStack {
-                                    Text("5 km")
+                                    Text("1 km")
                                         .font(.caption2)
                                         .foregroundColor(.white.opacity(0.5))
 
                                     Spacer()
 
-                                    Text("20 km")
+                                    Text("5 km")
                                         .font(.caption2)
                                         .foregroundColor(.white.opacity(0.5))
                                 }

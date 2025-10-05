@@ -16,8 +16,8 @@ class ProximityFilter {
 
     // MARK: - Constants
 
-    /// Radio máximo de visibilidad por defecto en metros (10km)
-    static let defaultMaxRadius: CLLocationDistance = 10_000
+    /// Radio máximo de visibilidad por defecto en metros (2km)
+    static let defaultMaxRadius: CLLocationDistance = 2_000
 
     // MARK: - Public Methods
 
@@ -25,7 +25,7 @@ class ProximityFilter {
     /// - Parameters:
     ///   - zones: Array de zonas a filtrar
     ///   - userLocation: Ubicación del usuario
-    ///   - maxRadius: Radio máximo en metros (default: 10km)
+    ///   - maxRadius: Radio máximo en metros (default: 2km)
     /// - Returns: Zonas dentro del radio especificado
     static func filterZones(
         _ zones: [AirQualityZone],
@@ -45,7 +45,7 @@ class ProximityFilter {
     /// - Parameters:
     ///   - annotations: Array de annotations a filtrar
     ///   - userLocation: Ubicación del usuario
-    ///   - maxRadius: Radio máximo en metros (default: 10km)
+    ///   - maxRadius: Radio máximo en metros (default: 2km)
     /// - Returns: Annotations dentro del radio especificado
     static func filterAnnotations(
         _ annotations: [CustomAnnotation],
@@ -65,7 +65,7 @@ class ProximityFilter {
     /// - Parameters:
     ///   - arrows: Array de flechas a filtrar
     ///   - userLocation: Ubicación del usuario
-    ///   - maxRadius: Radio máximo en metros (default: 10km)
+    ///   - maxRadius: Radio máximo en metros (default: 2km)
     /// - Returns: Flechas dentro del radio especificado
     static func filterRouteArrows(
         _ arrows: [RouteArrowAnnotation],
@@ -106,7 +106,7 @@ class ProximityFilter {
     /// - Parameters:
     ///   - coordinate: Coordenada a verificar
     ///   - userLocation: Ubicación del usuario
-    ///   - maxRadius: Radio máximo en metros (default: 10km)
+    ///   - maxRadius: Radio máximo en metros (default: 2km)
     /// - Returns: true si está dentro del radio
     static func isWithinRadius(
         _ coordinate: CLLocationCoordinate2D,

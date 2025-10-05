@@ -110,9 +110,9 @@ struct EnhancedMapView: View {
         routeManager.currentRoute != nil || routeManager.isCalculating
     }
 
-    // MARK: - Proximity Filtering (10km Radius)
+    // MARK: - Proximity Filtering (2km Radius)
 
-    /// Zonas de calidad del aire dentro del rango de visibilidad (10km)
+    /// Zonas de calidad del aire dentro del rango de visibilidad (2km)
     private var visibleAirQualityZones: [AirQualityZone] {
         guard let userLocation = locationManager.userLocation else {
             return airQualityGridManager.zones
@@ -140,7 +140,7 @@ struct EnhancedMapView: View {
         return filtered
     }
 
-    /// Alerts dentro del rango de visibilidad (10km)
+    /// Alerts dentro del rango de visibilidad (2km)
     private var visibleAnnotations: [CustomAnnotation] {
         guard let userLocation = locationManager.userLocation else {
             return annotations
@@ -169,7 +169,7 @@ struct EnhancedMapView: View {
         return filtered
     }
 
-    /// Route arrows dentro del rango de visibilidad (10km)
+    /// Route arrows dentro del rango de visibilidad (2km)
     private var visibleRouteArrows: [RouteArrowAnnotation] {
         guard let userLocation = locationManager.userLocation else {
             return routeArrows
@@ -689,7 +689,7 @@ struct EnhancedMapView: View {
                 // Location button
                 FloatingActionButton(
                     icon: "location.fill",
-                    color: .green,
+                    color: .blue,
                     size: 50
                 ) {
                     centerOnUser()
@@ -698,7 +698,7 @@ struct EnhancedMapView: View {
                 // Map style button
                 FloatingActionButton(
                     icon: mapStyle.icon,
-                    color: .purple,
+                    color: .blue,
                     size: 50
                 ) {
                     cycleMapStyle()
@@ -707,7 +707,7 @@ struct EnhancedMapView: View {
                 // Air Quality Layer button
                 FloatingActionButton(
                     icon: "aqi.medium",
-                    color: showAirQualityLayer ? .blue : .gray,
+                    color: showAirQualityLayer ? .mint : .gray,
                     size: 50,
                     isPrimary: showAirQualityLayer
                 ) {

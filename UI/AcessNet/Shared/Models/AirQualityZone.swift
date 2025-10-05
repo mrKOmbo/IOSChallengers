@@ -118,15 +118,15 @@ struct AirQualityGridConfig {
 
     // MARK: - Presets
 
-    /// Configuración por defecto (7x7 grid, 500m radius, 1500m spacing)
-    /// Optimizado para cobertura de 10km con filtrado por proximidad
-    /// - Grid: 7x7 = 49 zonas generadas
-    /// - Radio total: 1500m × 3.5 = 5.25km (10.5km diámetro)
-    /// - Con filtrado 10km: ~35-40 zonas visibles
+    /// Configuración por defecto (5x5 grid, 500m radius, 600m spacing)
+    /// Optimizado para cobertura de 2km con filtrado por proximidad
+    /// - Grid: 5x5 = 25 zonas generadas
+    /// - Radio total: 600m × 2.5 = 1.5km (3km diámetro)
+    /// - Con filtrado 2km: ~20-22 zonas visibles
     static let `default` = AirQualityGridConfig(
-        gridSize: 7,
+        gridSize: 5,
         zoneRadius: 500,
-        spacing: 1500,
+        spacing: 600,
         cacheTime: 120 // 2 minutos
     )
 
