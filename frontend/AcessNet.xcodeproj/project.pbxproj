@@ -10,9 +10,22 @@
 		2621969C2E80F60C007E3787 /* AirWay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirWay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		262196AE2E80F9DB007E3787 /* Exceptions for "AcessNet" folder in "AirWay" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2621969B2E80F60C007E3787 /* AirWay */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2621969E2E80F60C007E3787 /* AcessNet */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				262196AE2E80F9DB007E3787 /* Exceptions for "AcessNet" folder in "AirWay" target */,
+			);
 			path = AcessNet;
 			sourceTree = "<group>";
 		};
