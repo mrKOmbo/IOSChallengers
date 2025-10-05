@@ -499,7 +499,7 @@ struct EnhancedMapView: View {
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
+                            style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
                         )
 
                     // CAPA 2: Línea animada con marching ants elegante
@@ -511,7 +511,7 @@ struct EnhancedMapView: View {
                                 endPoint: .trailing
                             ),
                             style: StrokeStyle(
-                                lineWidth: 5,
+                                lineWidth: 3,
                                 lineCap: .round,
                                 lineJoin: .round,
                                 dash: [10, 12],
@@ -523,7 +523,7 @@ struct EnhancedMapView: View {
                     MapPolyline(routeInfo.polyline)
                         .stroke(
                             Color.blue.opacity(0.3),
-                            style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round)
+                            style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round)
                         )
                 }
 

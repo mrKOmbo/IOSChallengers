@@ -70,7 +70,7 @@ struct RoutePolylineMapContent: MapContent {
             .stroke(
                 Color.black.opacity(0.3),
                 style: StrokeStyle(
-                    lineWidth: isSelected ? 14 : 10,
+                    lineWidth: isSelected ? 8 : 6,
                     lineCap: .round,
                     lineJoin: .round
                 )
@@ -85,7 +85,7 @@ struct RoutePolylineMapContent: MapContent {
                     endPoint: .trailing
                 ),
                 style: StrokeStyle(
-                    lineWidth: isSelected ? 10 : 7,
+                    lineWidth: isSelected ? 6 : 4,
                     lineCap: .round,
                     lineJoin: .round
                 )
@@ -104,7 +104,7 @@ struct RoutePolylineMapContent: MapContent {
                         endPoint: .trailing
                     ),
                     style: StrokeStyle(
-                        lineWidth: 12,
+                        lineWidth: 7,
                         lineCap: .round,
                         lineJoin: .round,
                         dash: [20, 15],
