@@ -304,7 +304,7 @@ struct EnhancedMapView: View {
                             routeManager.updateAirQualityZones(airQualityGridManager.zones)
 
                             // Recalcular
-                            routeManager.calculateRoute(from: userLocation, to: destination.coordinate)
+                            routeManager.calculateRoute(from: userLocation, to: destination.coordinate, destinationName: destination.title)
                         }
                     }
                 )
@@ -336,7 +336,7 @@ struct EnhancedMapView: View {
                             applyRoutePreferences()
 
                             // Calcular ruta considerando todos los factores
-                            routeManager.calculateRoute(from: userLocation, to: locationInfo.coordinate)
+                            routeManager.calculateRoute(from: userLocation, to: locationInfo.coordinate, destinationName: locationInfo.title)
 
                             // Hacer zoom para mostrar toda la ruta después de calcularla
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -891,7 +891,7 @@ struct EnhancedMapView: View {
             applyRoutePreferences()
 
             // Calcular ruta considerando todos los factores
-            routeManager.calculateRoute(from: origin, to: coordinate)
+            routeManager.calculateRoute(from: origin, to: coordinate, destinationName: title)
 
             // Hacer zoom para mostrar toda la ruta después de calcularla con delay mayor
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
