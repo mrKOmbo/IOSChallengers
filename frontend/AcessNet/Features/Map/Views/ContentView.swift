@@ -1007,22 +1007,19 @@ struct EnhancedMapView: View {
         // Centrar cámara en el punto seleccionado
         centerCamera(on: coordinate, distance: 800)
 
-        // Obtener datos de calidad del aire del BACKEND REAL
-        Task {
-            do {
-                print("\n👆 ===== LONG PRESS EN MAPA =====")
-                print("📍 Coordenadas: \(coordinate.latitude), \(coordinate.longitude)")
+        // Obtener datos de calidad del aire del GENERADOR SIMULADO (consistente con círculos)
+        print("\n👆 ===== LONG PRESS EN MAPA =====")
+        print("📍 Coordenadas: \(coordinate.latitude), \(coordinate.longitude)")
 
-                // Consultar backend real
-                let airQuality = try await AirQualityAPIService.shared.getCurrentAQI(
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
-                )
+        // Usar generador simulado (mismo que círculos del mapa)
+        let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
+            for: coordinate,
+            includeExtendedMetrics: false
+        )
 
-                // Obtener información del lugar con reverse geocoding
-                await MainActor.run {
-                    searchManager.reverseGeocode(coordinate: coordinate) { address in
-                        DispatchQueue.main.async {
+        // Obtener información del lugar con reverse geocoding
+        searchManager.reverseGeocode(coordinate: coordinate) { address in
+            DispatchQueue.main.async {
                             // Calcular distancia desde el usuario
                             let distanceText: String
                             if let userLocation = locationManager.userLocation {
@@ -1039,103 +1036,36 @@ struct EnhancedMapView: View {
                                 distanceText = "Ubicación desconocida"
                             }
 
-                            // Dividir dirección para obtener nombre y detalles
-                            let parsedAddress = splitAddress(address)
+                // Dividir dirección para obtener nombre y detalles
+                let parsedAddress = splitAddress(address)
 
-                            // Crear LocationInfo con datos REALES del backend
-                            let locationInfo = LocationInfo(
-                                coordinate: coordinate,
-                                title: parsedAddress.title,
-                                subtitle: parsedAddress.subtitle,
-                                distanceFromUser: distanceText,
-                                airQuality: airQuality
-                            )
-
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                selectedLocationInfo = locationInfo
-                                showLocationInfo = true
-                            }
-
-                            // Actualizar destino para mostrar etiqueta adecuada en el mapa
-                            destination = DestinationPoint(
-                                coordinate: coordinate,
-                                title: parsedAddress.title,
-                                subtitle: parsedAddress.subtitle
-                            )
-
-                            print("✅ LocationInfo mostrado con DATOS REALES")
-                            print("   Lugar: \(parsedAddress.title)")
-                            print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
-                            print("   PM2.5: \(String(format: "%.1f", airQuality.pm25)) μg/m³")
-                            print("   Health Risk: \(airQuality.healthRisk.rawValue)")
-                            print("===== END LONG PRESS =====\n")
-                        }
-                    }
-                }
-
-            } catch {
-                print("\n⚠️ ===== ERROR EN BACKEND (LONG PRESS) =====")
-                print("❌ Error: \(error.localizedDescription)")
-                print("   Tipo: \(type(of: error))")
-                print("🔄 Activando fallback a datos simulados...")
-
-                // Fallback a datos simulados
-                let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
-                    for: coordinate,
-                    includeExtendedMetrics: true
+                // Crear LocationInfo con datos SIMULADOS (consistente con círculos)
+                let locationInfo = LocationInfo(
+                    coordinate: coordinate,
+                    title: parsedAddress.title,
+                    subtitle: parsedAddress.subtitle,
+                    distanceFromUser: distanceText,
+                    airQuality: airQuality
                 )
 
-                await MainActor.run {
-                    searchManager.reverseGeocode(coordinate: coordinate) { address in
-                        DispatchQueue.main.async {
-                            // Calcular distancia desde el usuario
-                            let distanceText: String
-                            if let userLocation = locationManager.userLocation {
-                                let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
-                                let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                                let distance = userCLLocation.distance(from: selectedCLLocation)
-
-                                if distance < 1000 {
-                                    distanceText = String(format: "%.0f m de tu ubicación", distance)
-                                } else {
-                                    distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
-                                }
-                            } else {
-                                distanceText = "Ubicación desconocida"
-                            }
-
-                            // Dividir dirección para obtener nombre y detalles
-                            let parsedAddress = splitAddress(address)
-
-                            // Crear LocationInfo con datos simulados (fallback)
-                            let locationInfo = LocationInfo(
-                                coordinate: coordinate,
-                                title: parsedAddress.title,
-                                subtitle: parsedAddress.subtitle,
-                                distanceFromUser: distanceText,
-                                airQuality: airQuality
-                            )
-
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                selectedLocationInfo = locationInfo
-                                showLocationInfo = true
-                            }
-
-                            // Actualizar destino para mostrar etiqueta adecuada en el mapa
-                            destination = DestinationPoint(
-                                coordinate: coordinate,
-                                title: parsedAddress.title,
-                                subtitle: parsedAddress.subtitle
-                            )
-
-                            print("⚠️ LocationInfo mostrado con DATOS SIMULADOS (fallback)")
-                            print("   Lugar: \(parsedAddress.title)")
-                            print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
-                            print("   Fuente: AirQualityDataGenerator (local)")
-                            print("===== END LONG PRESS (FALLBACK) =====\n")
-                        }
-                    }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    selectedLocationInfo = locationInfo
+                    showLocationInfo = true
                 }
+
+                // Actualizar destino para mostrar etiqueta adecuada en el mapa
+                destination = DestinationPoint(
+                    coordinate: coordinate,
+                    title: parsedAddress.title,
+                    subtitle: parsedAddress.subtitle
+                )
+
+                print("✅ LocationInfo mostrado con DATOS SIMULADOS")
+                print("   Lugar: \(parsedAddress.title)")
+                print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
+                print("   PM2.5: \(String(format: "%.1f", airQuality.pm25)) μg/m³")
+                print("   Health Risk: \(airQuality.healthRisk.rawValue)")
+                print("===== END LONG PRESS =====\n")
             }
         }
     }
