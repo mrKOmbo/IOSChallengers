@@ -88,6 +88,13 @@ struct EnhancedMapView: View {
     // MARK: - Route Animation State (Optimizado)
     @State private var dashPhase: CGFloat = 0  // Marching ants
 
+    // MARK: - Air Quality Overlay State
+    @StateObject private var airQualityGridManager = AirQualityGridManager()
+    @State private var showAirQualityLayer: Bool = false
+    @State private var showAirQualityLegend: Bool = false
+    @State private var selectedZone: AirQualityZone?
+    @State private var showZoneDetail: Bool = false
+
     // Enhanced tab bar height - usando constante global
     private let tabBarHeight: CGFloat = AppConstants.enhancedTabBarTotalHeight
 
@@ -257,6 +264,42 @@ struct EnhancedMapView: View {
                 }
             }
 
+            // Air Quality Legend (superior derecha)
+            if showAirQualityLayer && !isSearchFocused {
+                VStack {
+                    HStack {
+                        Spacer()
+
+                        AirQualityLegendView(
+                            isExpanded: $showAirQualityLegend,
+                            statistics: airQualityGridManager.getStatistics()
+                        )
+                        .frame(maxWidth: 280)
+                        .padding(.trailing)
+                    }
+                    .padding(.top, AppConstants.safeAreaTop + 80)
+
+                    Spacer()
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+
+            // Zone Detail Card (cuando se toca una zona)
+            if showZoneDetail, let zone = selectedZone, !isSearchFocused {
+                VStack {
+                    Spacer()
+
+                    AirQualityZoneDetailCard(zone: zone) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showZoneDetail = false
+                            selectedZone = nil
+                        }
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, tabBarHeight + 12)
+                }
+            }
+
             // Botones flotantes (ocultar cuando búsqueda está activa, hay ruta, o se muestra location info)
             if !isSearchFocused && !hasActiveRoute && !showLocationInfo {
                 floatingButtons
@@ -270,10 +313,26 @@ struct EnhancedMapView: View {
                 searchManager.updateSearchRegion(center: location)
             }
         }
+        .onChange(of: showAirQualityLayer) { _, newValue in
+            if newValue {
+                // Activar capa de calidad del aire
+                if let userLocation = locationManager.userLocation {
+                    airQualityGridManager.startAutoUpdate(center: userLocation)
+                }
+            } else {
+                // Desactivar capa
+                airQualityGridManager.stopAutoUpdate()
+            }
+        }
         .onReceive(locationManager.$userLocation) { newLocation in
             // Actualizar región de búsqueda cuando cambie ubicación del usuario
             if let location = newLocation {
                 searchManager.updateSearchRegion(center: location)
+
+                // Actualizar grid de calidad del aire si está activo
+                if showAirQualityLayer {
+                    airQualityGridManager.updateGrid(center: location)
+                }
             }
         }
         .onReceive(routeManager.$currentRoute) { newRoute in
@@ -414,6 +473,27 @@ struct EnhancedMapView: View {
                             .pulseEffect(color: .red, duration: 1.0)
                     }
                 }
+
+                // 🌍 AIR QUALITY ZONES OVERLAY
+                if showAirQualityLayer {
+                    ForEach(airQualityGridManager.zones) { zone in
+                        // MapCircle para cada zona
+                        MapCircle(center: zone.coordinate, radius: zone.radius)
+                            .foregroundStyle(zone.fillColor)
+                            .stroke(zone.strokeColor, lineWidth: 1.5)
+
+                        // Anotación central opcional (solo para zonas unhealthy+)
+                        if zone.level.rawValue != "Good" && zone.level.rawValue != "Moderate" {
+                            Annotation("", coordinate: zone.coordinate) {
+                                AirQualityCloudAnnotation(zone: zone, showPulse: zone.level == .unhealthy || zone.level == .severe)
+                                    .onTapGesture {
+                                        handleZoneTap(zone)
+                                    }
+                            }
+                            .annotationTitles(.hidden)
+                        }
+                    }
+                }
             }
             .mapStyle(mapStyle.style)
             .mapControls {
@@ -461,6 +541,16 @@ struct EnhancedMapView: View {
                 ) {
                     cycleMapStyle()
                 }
+
+                // Air Quality Layer button
+                FloatingActionButton(
+                    icon: "aqi.medium",
+                    color: showAirQualityLayer ? .blue : .gray,
+                    size: 50,
+                    isPrimary: showAirQualityLayer
+                ) {
+                    toggleAirQualityLayer()
+                }
             }
             .padding(.leading, 20)
 
@@ -487,9 +577,6 @@ struct EnhancedMapView: View {
         let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.impactOccurred()
 
-        // Establecer destino temporal SIN calcular ruta
-        setDestination(at: coordinate, title: "Punto B", subtitle: nil, calculateRoute: false)
-
         // Centrar cámara en el punto seleccionado
         centerCamera(on: coordinate, distance: 800)
 
@@ -503,38 +590,68 @@ struct EnhancedMapView: View {
 
         // Obtener información del lugar con reverse geocoding
         searchManager.reverseGeocode(coordinate: coordinate) { address in
-            // Calcular distancia desde el usuario
-            let distanceText: String
-            if let userLocation = locationManager.userLocation {
-                let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
-                let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                let distance = userCLLocation.distance(from: selectedCLLocation)
+            DispatchQueue.main.async {
+                // Calcular distancia desde el usuario
+                let distanceText: String
+                if let userLocation = locationManager.userLocation {
+                    let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                    let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                    let distance = userCLLocation.distance(from: selectedCLLocation)
 
-                // Formatear distancia
-                if distance < 1000 {
-                    distanceText = String(format: "%.0f m de tu ubicación", distance)
+                    if distance < 1000 {
+                        distanceText = String(format: "%.0f m de tu ubicación", distance)
+                    } else {
+                        distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                    }
                 } else {
-                    distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                    distanceText = "Ubicación desconocida"
                 }
-            } else {
-                distanceText = "Ubicación desconocida"
-            }
 
-            // Crear LocationInfo CON datos de calidad del aire
-            let locationInfo = LocationInfo(
-                coordinate: coordinate,
-                title: address ?? "Ubicación Seleccionada",
-                subtitle: address,
-                distanceFromUser: distanceText,
-                airQuality: airQuality  // ⭐ Incluir AQI simulado
-            )
+                // Dividir dirección para obtener nombre y detalles
+                let parsedAddress = splitAddress(address)
 
-            // Mostrar card con información y animación
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                selectedLocationInfo = locationInfo
-                showLocationInfo = true
+                // Crear LocationInfo con datos enriquecidos
+                let locationInfo = LocationInfo(
+                    coordinate: coordinate,
+                    title: parsedAddress.title,
+                    subtitle: parsedAddress.subtitle,
+                    distanceFromUser: distanceText,
+                    airQuality: airQuality
+                )
+
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    selectedLocationInfo = locationInfo
+                    showLocationInfo = true
+                }
+
+                // Actualizar destino para mostrar etiqueta adecuada en el mapa
+                destination = DestinationPoint(
+                    coordinate: coordinate,
+                    title: parsedAddress.title,
+                    subtitle: parsedAddress.subtitle
+                )
             }
         }
+    }
+
+    /// Divide la dirección recibida en un título principal y detalles opcionales
+    private func splitAddress(_ address: String?) -> (title: String, subtitle: String?) {
+        guard let rawAddress = address?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawAddress.isEmpty else {
+            return ("Ubicación Seleccionada", nil)
+        }
+
+        let components = rawAddress
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        guard let firstComponent = components.first else {
+            return (rawAddress, nil)
+        }
+
+        let remaining = components.dropFirst().joined(separator: ", ")
+        return (String(firstComponent), remaining.isEmpty ? nil : remaining)
     }
 
     private func centerOnUser() {
@@ -679,6 +796,44 @@ struct EnhancedMapView: View {
             withAnimation(.easeOut(duration: 0.25)) {
                 showRouteToast = false
             }
+        }
+    }
+
+    // MARK: - Air Quality Methods
+
+    private func toggleAirQualityLayer() {
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            showAirQualityLayer.toggle()
+
+            // Expandir leyenda automáticamente la primera vez
+            if showAirQualityLayer && !showAirQualityLegend {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showAirQualityLegend = true
+                    }
+                }
+            }
+        }
+
+        // Si se activa, inicializar grid
+        if showAirQualityLayer, let userLocation = locationManager.userLocation {
+            airQualityGridManager.startAutoUpdate(center: userLocation)
+        }
+    }
+
+    private func handleZoneTap(_ zone: AirQualityZone) {
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+
+        // Mostrar detalle de la zona
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            selectedZone = zone
+            showZoneDetail = true
         }
     }
 

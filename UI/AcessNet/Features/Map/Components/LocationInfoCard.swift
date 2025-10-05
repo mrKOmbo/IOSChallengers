@@ -17,6 +17,14 @@ struct LocationInfoCard: View {
 
     @State private var isPressed = false
     @State private var showContent = false
+    private var sanitizedSubtitle: String? {
+        guard let subtitle = locationInfo.subtitle?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !subtitle.isEmpty else {
+            return nil
+        }
+        return subtitle
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,13 +54,15 @@ struct LocationInfoCard: View {
             Divider()
                 .opacity(showContent ? 1 : 0)
 
-            // SECCIÓN 2: Ubicación
-            locationSection
-                .opacity(showContent ? 1 : 0)
-                .offset(x: showContent ? 0 : -15)
+            if sanitizedSubtitle != nil {
+                // SECCIÓN 2: Ubicación
+                locationSection
+                    .opacity(showContent ? 1 : 0)
+                    .offset(x: showContent ? 0 : -15)
 
-            Divider()
-                .opacity(showContent ? 1 : 0)
+                Divider()
+                    .opacity(showContent ? 1 : 0)
+            }
 
             // SECCIÓN 3: Calidad del Aire ⭐
             airQualitySection
@@ -144,7 +154,7 @@ struct LocationInfoCard: View {
 
     private var locationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let subtitle = locationInfo.subtitle, !subtitle.isEmpty {
+            if let subtitle = sanitizedSubtitle {
                 HStack(spacing: 8) {
                     Image(systemName: "building.2")
                         .font(.system(size: 14))
