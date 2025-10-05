@@ -19,7 +19,11 @@ enum RoutePreference {
     case cleanestAir                                      // Mejor calidad del aire (100% aire)
     case balanced                                         // Balanceado (50% tiempo + 50% aire)
     case healthOptimized                                  // Optimizado para salud (30% tiempo + 70% aire)
+    case safest                                          // Ruta más segura (evitar incidentes)
+    case avoidIncidents                                   // Evitar áreas con incidentes activos
+    case balancedSafety                                   // Balanceado con seguridad (33% cada uno)
     case customWeighted(timeWeight: Double, airQualityWeight: Double)  // Pesos personalizados
+    case customWeightedSafety(timeWeight: Double, airQualityWeight: Double, safetyWeight: Double)  // Pesos personalizados con seguridad
 
     var transportType: MKDirectionsTransportType {
         return .automobile
@@ -32,9 +36,21 @@ enum RoutePreference {
     /// Indica si esta preferencia requiere datos de calidad del aire
     var requiresAirQualityData: Bool {
         switch self {
-        case .fastest, .shortest, .avoidHighways:
+        case .fastest, .shortest, .avoidHighways, .safest, .avoidIncidents:
             return false
-        case .cleanestAir, .balanced, .healthOptimized, .customWeighted:
+        case .cleanestAir, .balanced, .healthOptimized, .customWeighted, .balancedSafety, .customWeightedSafety:
+            return true
+        }
+    }
+
+    /// Indica si esta preferencia requiere datos de incidentes
+    var requiresIncidentData: Bool {
+        switch self {
+        case .fastest, .shortest, .avoidHighways, .cleanestAir:
+            return false
+        case .balanced, .healthOptimized, .customWeighted:
+            return false
+        case .safest, .avoidIncidents, .balancedSafety, .customWeightedSafety:
             return true
         }
     }
@@ -71,12 +87,20 @@ struct LocationInfo: Identifiable {
     let title: String
     let subtitle: String?
     let distanceFromUser: String
+    let airQuality: AirQualityPoint
 
-    init(coordinate: CLLocationCoordinate2D, title: String, subtitle: String? = nil, distanceFromUser: String) {
+    init(
+        coordinate: CLLocationCoordinate2D,
+        title: String,
+        subtitle: String? = nil,
+        distanceFromUser: String,
+        airQuality: AirQualityPoint
+    ) {
         self.coordinate = coordinate
         self.title = title
         self.subtitle = subtitle
         self.distanceFromUser = distanceFromUser
+        self.airQuality = airQuality
     }
 
     /// Formatea las coordenadas para mostrar
@@ -84,6 +108,28 @@ struct LocationInfo: Identifiable {
         let lat = String(format: "%.4f", coordinate.latitude)
         let lon = String(format: "%.4f", coordinate.longitude)
         return "\(lat), \(lon)"
+    }
+
+    // MARK: - Air Quality Computed Properties
+
+    /// Nivel de calidad del aire
+    var aqiLevel: AQILevel {
+        return airQuality.level
+    }
+
+    /// Riesgo para la salud
+    var healthRisk: HealthRisk {
+        return airQuality.healthRisk
+    }
+
+    /// Indica si la calidad del aire es saludable (AQI < 100)
+    var isHealthySafety: Bool {
+        return airQuality.aqi < 100
+    }
+
+    /// Mensaje de salud según el nivel AQI
+    var healthMessage: String {
+        return aqiLevel.extendedHealthMessage
     }
 }
 

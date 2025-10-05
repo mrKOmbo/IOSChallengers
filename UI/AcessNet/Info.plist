@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>&quot;Se necesita tu ubicación para mostrarla en el mapa.&quot;</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>HarmonyOS_Sans_Black_Italic.ttf</string>

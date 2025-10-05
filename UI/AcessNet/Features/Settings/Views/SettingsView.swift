@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var appSettings: AppSettings
     @State private var selectedAQI: AQIStandard = .european
     @State private var selectedTemperature: TemperatureUnit = .celsius
     @State private var selectedWindSpeed: WindSpeedUnit = .kmh
@@ -157,6 +158,102 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal)
 
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.vertical, 24)
+
+                    // Performance Section
+                    VStack(alignment: .leading, spacing: 0) {
+                        SectionHeader(title: "PERFORMANCE")
+                            .padding(.bottom, 16)
+
+                        // Proximity Filtering Toggle
+                        SettingsToggleRow(
+                            title: "Proximity Filtering",
+                            subtitle: "Show only nearby elements (\(Int(appSettings.proximityRadiusKm))km)",
+                            isOn: $appSettings.enableProximityFiltering
+                        )
+
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.leading, 16)
+
+                        // Proximity Radius Slider
+                        if appSettings.enableProximityFiltering {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Visibility Radius")
+                                        .font(.body)
+                                        .foregroundColor(.white)
+
+                                    Spacer()
+
+                                    Text("\(Int(appSettings.proximityRadiusKm)) km")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundColor(Color("AccentColor"))
+                                }
+
+                                Slider(
+                                    value: $appSettings.proximityRadiusKm,
+                                    in: 5...20,
+                                    step: 1
+                                )
+                                .tint(Color("AccentColor"))
+
+                                HStack {
+                                    Text("5 km")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.5))
+
+                                    Spacer()
+
+                                    Text("20 km")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
+                            }
+                            .padding(.vertical, 16)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+
+                            Divider()
+                                .background(Color.white.opacity(0.1))
+                                .padding(.leading, 16)
+                        }
+
+                        // Performance Info Card
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                Image(systemName: appSettings.enableProximityFiltering ? "checkmark.circle.fill" : "info.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(appSettings.enableProximityFiltering ? .green : .blue)
+
+                                Text(appSettings.enableProximityFiltering ? "Performance Optimized" : "Showing All Elements")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+
+                            Text("Grid: \(appSettings.totalAirQualityZones) zones • Static rendering")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.6))
+
+                            if appSettings.enableProximityFiltering {
+                                Text("Elements beyond \(Int(appSettings.proximityRadiusKm))km are hidden for better performance.")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .padding(.top, 4)
+                            } else {
+                                Text("All elements are visible. Performance may vary with many elements.")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                                    .padding(.top, 4)
+                            }
+                        }
+                        .padding()
+                        .background(appSettings.enableProximityFiltering ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .padding(.horizontal)
+
                     // Support us Section
                     VStack(alignment: .leading, spacing: 20) {
                         Text("Support us")
@@ -245,6 +342,41 @@ struct SupportButton: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
         }
+    }
+}
+
+struct SectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline)
+            .foregroundColor(.white.opacity(0.7))
+            .tracking(1)
+            .padding(.horizontal)
+    }
+}
+
+struct SettingsToggleRow: View {
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.white)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .tint(Color("AccentColor"))
+        .padding(.horizontal)
+        .padding(.vertical, 12)
     }
 }
 

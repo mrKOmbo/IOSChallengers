@@ -14,7 +14,7 @@ struct DirectionalArrowView: View {
     let isNext: Bool  // Si es la siguiente flecha a seguir
     let size: CGFloat
 
-    init(heading: Double, isNext: Bool = false, size: CGFloat = 40) {
+    init(heading: Double, isNext: Bool = false, size: CGFloat = 30) {
         self.heading = heading
         self.isNext = isNext
         self.size = size
@@ -58,7 +58,7 @@ struct DirectionalArrowView: View {
             // Flecha
             ArrowShape()
                 .fill(.white)
-                .frame(width: size * 0.5, height: size * 0.5)
+                .frame(width: size * 0.4, height: size * 0.4)
                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
         }
         .rotationEffect(.degrees(heading))

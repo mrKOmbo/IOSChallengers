@@ -76,7 +76,6 @@ struct SearchResultsView: View {
                     }
                 }
             }
-            .padding(.vertical, 8)
         }
         .frame(maxHeight: 300) // Máximo 5-6 resultados visibles
     }

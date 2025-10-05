@@ -11,6 +11,7 @@ import UserNotifications
 @main
 struct AirWayApp: App {
     private let notificationHandler = NotificationHandler()
+    @StateObject private var appSettings = AppSettings.shared
 
     init() {
         UNUserNotificationCenter.current().delegate = notificationHandler
@@ -19,6 +20,7 @@ struct AirWayApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
+                .environmentObject(appSettings)
         }
     }
 }
