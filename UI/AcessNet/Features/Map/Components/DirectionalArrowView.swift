@@ -20,8 +20,6 @@ struct DirectionalArrowView: View {
         self.size = size
     }
 
-    @State private var animate = false
-
     var body: some View {
         ZStack {
             // Sombra de fondo para efecto 3D elevado
@@ -62,18 +60,6 @@ struct DirectionalArrowView: View {
                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
         }
         .rotationEffect(.degrees(heading))
-        .scaleEffect(animate && isNext ? 1.1 : 1.0)
-        .animation(
-            isNext ?
-                .easeInOut(duration: 0.8).repeatForever(autoreverses: true) :
-                nil,
-            value: animate
-        )
-        .onAppear {
-            if isNext {
-                animate = true
-            }
-        }
     }
 }
 

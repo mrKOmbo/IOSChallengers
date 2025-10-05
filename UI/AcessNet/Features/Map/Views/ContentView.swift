@@ -479,6 +479,12 @@ struct EnhancedMapView: View {
 
                     // Contenido de ruta
                     VStack(spacing: 12) {
+                        // DEBUG: Logging de estado
+                        let _ = print("🐛 DEBUG - allScoredRoutes count: \(routeManager.allScoredRoutes.count)")
+                        let _ = print("🐛 DEBUG - currentRoute exists: \(routeManager.currentRoute != nil)")
+                        let _ = print("🐛 DEBUG - isInNavigationMode: \(isInNavigationMode)")
+                        let _ = print("🐛 DEBUG - isCalculating: \(routeManager.isCalculating)")
+
                         // Selector de rutas múltiples
                         if !routeManager.allScoredRoutes.isEmpty {
                             RouteCardsSelector(
@@ -832,7 +838,7 @@ struct EnhancedMapView: View {
                     Annotation("", coordinate: arrow.coordinate) {
                         DirectionalArrowView(
                             heading: arrow.heading,
-                            isNext: index == 0, // Primera flecha es la siguiente
+                            isNext: false, // Sin animación - todas las flechas estáticas
                             size: 30
                         )
                     }
