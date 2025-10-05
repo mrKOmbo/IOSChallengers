@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from adapters.router.osrm_client import OSRMClient
 from adapters.air.openaq_grid_provider import OpenAQGridProvider
 from application.routes.exposure import ExposureService
-
+from adapters.air.waqi_forecast_provider import WAQIForecastProvider
 
 class HealthCheckView(APIView):
     """Health check endpoint for Docker."""
@@ -37,7 +37,6 @@ class CurrentAQIView(APIView):
             data = air.get_aqi_cell(lat, lon, when)
             
             # Categoría de AQI
-            print("aqi: ", data.get("aqi"))
             aqi = data.get("aqi", 0)
             if aqi <= 50:
                 category = "Bueno"
@@ -76,8 +75,11 @@ class CurrentAQIView(APIView):
                 "message": message,
                 "pollutants": {
                     "pm25": data.get("pm25"),
+                    "pm10": data.get("pm10"),
                     "o3": data.get("o3"),
                     "no2": data.get("no2"),
+                    "co": data.get("co"),
+                    "so2": data.get("so2"),
                 }
             })
         except Exception as e:
@@ -158,3 +160,249 @@ class OptimalRouteView(APIView):
                 f"(α={alpha}, β={beta})"
             ),
         })
+
+class NearbyAirQualityView(APIView):
+    """
+    Devuelve múltiples zonas cercanas con su calidad del aire.
+    GET /api/v1/air/nearby?lat=19.4326&lon=-99.1332&radius=25000&limit=10
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat' y 'lon'."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parámetros opcionales
+        radius = int(request.query_params.get("radius", 25000))  # Default: 25km
+        limit = int(request.query_params.get("limit", 10))  # Default: 10 ubicaciones
+        
+        # Validaciones
+        if radius < 1000 or radius > 100000:
+            return Response(
+                {"error": "El radio debe estar entre 1000 y 100000 metros"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        if limit < 1 or limit > 50:
+            return Response(
+                {"error": "El límite debe estar entre 1 y 50"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        air = OpenAQGridProvider()
+        
+        try:
+            locations = air.get_nearby_locations(lat, lon, radius, limit)
+            
+            return Response({
+                "search_location": {
+                    "lat": lat,
+                    "lon": lon
+                },
+                "search_radius_meters": radius,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "total_found": len(locations),
+                "locations": locations
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener zonas cercanas: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AirQualityForecastView(APIView):
+    """
+    Devuelve predicción de calidad del aire para 24h y/o 48h en un radio de 10km.
+    GET /api/v1/air/forecast?lat=19.4326&lon=-99.1332&hours=48&radius_km=10
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat' y 'lon'."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parámetros opcionales
+        hours = int(request.query_params.get("hours", 48))  # Default: 48h
+        radius_km = int(request.query_params.get("radius_km", 10))  # Default: 10km
+        
+        # Validaciones
+        if hours not in [24, 48]:
+            return Response(
+                {"error": "Las horas deben ser 24 o 48"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        if radius_km < 1 or radius_km > 50:
+            return Response(
+                {"error": "El radio debe estar entre 1 y 50 km"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        forecast_provider = WAQIForecastProvider()
+        
+        try:
+            result = forecast_provider.get_forecast_with_radius(lat, lon, radius_km, hours)
+            
+            if not result:
+                return Response(
+                    {"error": "No se pudieron obtener predicciones para esta ubicación"},
+                    status=http_status.HTTP_404_NOT_FOUND
+                )
+            
+            return Response({
+                "location": result["center"],
+                "radius_km": result["radius_km"],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "current_aqi": result["current_aqi"],
+                "stations_sampled": result["stations_sampled"],
+                "forecast_24h": result.get("forecast_24h"),
+                "forecast_48h": result.get("forecast_48h") if hours == 48 else None,
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener predicción: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+from adapters.weather.openweather_provider import OpenWeatherProvider
+from adapters.weather.nasa_merra2_provider import NASAMERRA2Provider
+
+class CurrentWeatherView(APIView):
+    """
+    Devuelve datos meteorológicos actuales.
+    GET /api/v1/weather/current?lat=19.4326&lon=-99.1332
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat' y 'lon'."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        weather_provider = OpenWeatherProvider()
+        
+        try:
+            result = weather_provider.get_current_weather(lat, lon)
+            
+            if not result:
+                return Response(
+                    {"error": "No se pudieron obtener datos meteorológicos actuales"},
+                    status=http_status.HTTP_404_NOT_FOUND
+                )
+            
+            return Response({
+                "location": {"lat": lat, "lon": lon},
+                "current": result
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener datos actuales: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class WeatherForecastView(APIView):
+    """
+    Devuelve predicción meteorológica para 24h o 48h.
+    GET /api/v1/weather/forecast?lat=19.4326&lon=-99.1332&hours=48
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat' y 'lon'."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        hours = int(request.query_params.get("hours", 48))
+        
+        if hours not in [24, 48]:
+            return Response(
+                {"error": "Las horas deben ser 24 o 48"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        weather_provider = OpenWeatherProvider()
+        
+        try:
+            result = weather_provider.get_weather_forecast(lat, lon, hours)
+            
+            if not result:
+                return Response(
+                    {"error": "No se pudo obtener la predicción meteorológica"},
+                    status=http_status.HTTP_404_NOT_FOUND
+                )
+            
+            return Response({
+                "location": {"lat": lat, "lon": lon},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "forecast_hours": hours,
+                "hourly_forecast": result["hourly"],
+                "daily_summary": result["daily"],
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener predicción: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class HistoricalWeatherView(APIView):
+    """
+    Devuelve datos meteorológicos históricos de NASA MERRA-2.
+    GET /api/v1/weather/historical?lat=19.4326&lon=-99.1332&start_date=2024-01-01&end_date=2024-01-31
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+            start_date = request.query_params.get("start_date")
+            end_date = request.query_params.get("end_date")
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat', 'lon', 'start_date' (YYYY-MM-DD), 'end_date' (YYYY-MM-DD)"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not start_date or not end_date:
+            return Response(
+                {"error": "start_date y end_date son requeridos (formato: YYYY-MM-DD)"},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        merra2_provider = NASAMERRA2Provider()
+        
+        try:
+            result = merra2_provider.get_historical_weather(lat, lon, start_date, end_date)
+            
+            if not result:
+                return Response(
+                    {"error": "No se pudieron obtener datos históricos"},
+                    status=http_status.HTTP_404_NOT_FOUND
+                )
+            
+            return Response(result)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener datos históricos: {str(e)}"},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
