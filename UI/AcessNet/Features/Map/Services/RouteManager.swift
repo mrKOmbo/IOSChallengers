@@ -41,6 +41,9 @@ class RouteManager: ObservableObject {
     /// Progreso de optimización
     @Published var optimizationProgress: Double = 0.0
 
+    /// Indica si está en modo navegación activa
+    @Published var isInNavigationMode: Bool = false
+
     // MARK: - Private Properties
 
     private var currentTask: Task<Void, Never>?

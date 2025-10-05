@@ -101,6 +101,40 @@ class AirQualityGridManager: ObservableObject {
         }
     }
 
+    /// Obtiene la zona de calidad del aire en una coordenada específica
+    /// - Parameter coordinate: Coordenada a buscar
+    /// - Returns: Zona más cercana a la coordenada, o nil si no hay zonas
+    func getZoneAtCoordinate(_ coordinate: CLLocationCoordinate2D) -> AirQualityZone? {
+        guard !zones.isEmpty else { return nil }
+
+        // Buscar zona más cercana
+        return zones.min { zone1, zone2 in
+            let dist1 = coordinate.distance(to: zone1.coordinate)
+            let dist2 = coordinate.distance(to: zone2.coordinate)
+            return dist1 < dist2
+        }
+    }
+
+    /// Obtiene la zona de calidad del aire en una coordenada, pero solo si está dentro del radio
+    /// - Parameters:
+    ///   - coordinate: Coordenada a buscar
+    ///   - maxDistance: Distancia máxima para considerar (por defecto: radio de zona)
+    /// - Returns: Zona si está dentro del radio, nil si no
+    func getZoneContaining(_ coordinate: CLLocationCoordinate2D, maxDistance: CLLocationDistance? = nil) -> AirQualityZone? {
+        guard !zones.isEmpty else { return nil }
+
+        for zone in zones {
+            let distance = coordinate.distance(to: zone.coordinate)
+            let threshold = maxDistance ?? zone.radius
+
+            if distance <= threshold {
+                return zone
+            }
+        }
+
+        return nil
+    }
+
     /// Actualiza las zonas de calidad del aire a lo largo de las rutas con espaciado dinámico
     /// - Parameter polylines: Array de polylines de todas las rutas
     func updateZonesAlongRoutes(polylines: [MKPolyline]) {

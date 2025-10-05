@@ -15,6 +15,7 @@ struct EnhancedAirQualityDashboard: View {
     let statistics: AirQualityGridManager.GridStatistics?
     let referencePoint: AirQualityReferencePoint
     let activeRoute: ScoredRoute?
+    let onStartNavigation: (() -> Void)?
 
     @State private var animateCharts: Bool = false
     @State private var glowIntensity: Double = 0.3
@@ -247,9 +248,46 @@ struct EnhancedAirQualityDashboard: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
             } else {
-                // Padding bottom más pequeño para rutas
-                Color.clear
-                    .frame(height: 8)
+                // Botón Start Navigation para rutas
+                if let startNavigation = onStartNavigation {
+                    Divider()
+                        .padding(.horizontal, 16)
+
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        startNavigation()
+                    }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "location.fill.viewfinder")
+                                .font(.system(size: 18, weight: .semibold))
+
+                            Text("Start Navigation")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#00B020"),
+                                    Color(hex: "#00D428")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .shadow(color: Color(hex: "#00B020").opacity(0.4), radius: 10, x: 0, y: 4)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                } else {
+                    // Padding bottom más pequeño si no hay botón
+                    Color.clear
+                        .frame(height: 8)
+                }
             }
         }
     }
@@ -746,7 +784,8 @@ struct EnhancedAirQualityDashboard: View {
                     hazardousCount: 0
                 ),
                 referencePoint: .userLocation,
-                activeRoute: nil
+                activeRoute: nil,
+                onStartNavigation: nil
             )
             .frame(maxWidth: 320)
             .padding()

@@ -111,6 +111,10 @@ struct EnhancedMapView: View {
     @State private var showRoutePreferences: Bool = false
     @State private var selectedRouteIndex: Int? = nil
 
+    // MARK: - Navigation State
+    @StateObject private var navigationManager = NavigationManager()
+    @State private var isInNavigationMode: Bool = false
+
     // MARK: - Location Info State
     @State private var showLocationInfo: Bool = false
     @State private var selectedLocationInfo: LocationInfo?
@@ -143,7 +147,12 @@ struct EnhancedMapView: View {
 
     // Computed property para verificar si hay ruta activa
     private var hasActiveRoute: Bool {
-        routeManager.currentRoute != nil || routeManager.isCalculating
+        routeManager.currentRoute != nil || routeManager.isCalculating || isInNavigationMode
+    }
+
+    // Computed property para verificar si hay ruta activa para navegación
+    private var hasActiveRouteForNav: Bool {
+        routeManager.currentScoredRoute != nil && !isInNavigationMode
     }
 
     // MARK: - Proximity Filtering (2km Radius)
@@ -454,6 +463,15 @@ struct EnhancedMapView: View {
                                 }
                             )
                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                        } else if isInNavigationMode {
+                            // Panel de navegación activa
+                            NavigationPanel(
+                                navigationState: navigationManager.state,
+                                currentZone: navigationManager.currentZone,
+                                distanceToManeuver: navigationManager.distanceToNextManeuver,
+                                onEndNavigation: stopNavigation
+                            )
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         } else if routeManager.isCalculating {
                             CalculatingRouteView()
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -463,7 +481,7 @@ struct EnhancedMapView: View {
                                 scoredRoute: routeManager.currentScoredRoute,
                                 isCalculating: routeManager.isCalculating,
                                 onClear: clearRoute,
-                                onStartNavigation: nil, // Opcional: implementar navegación
+                                onStartNavigation: startNavigation,
                                 onViewAirQuality: {
                                     // Activar capa de calidad del aire centrada en la ruta
                                     let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -501,12 +519,7 @@ struct EnhancedMapView: View {
                         Spacer()
 
                         // Enhanced Dashboard con gráficos y breathability integrado
-                        EnhancedAirQualityDashboard(
-                            isExpanded: $showAirQualityLegend,
-                            statistics: airQualityGridManager.getStatistics(),
-                            referencePoint: airQualityReferencePoint,
-                            activeRoute: routeManager.currentScoredRoute
-                        )
+                        airQualityDashboard
                         .frame(maxWidth: 320)
                         .padding(.trailing)
                     }
@@ -546,10 +559,15 @@ struct EnhancedMapView: View {
                 }
             }
 
-            // Botones flotantes (ocultar cuando búsqueda está activa, hay ruta, o se muestra location info)
-            if !isSearchFocused && !hasActiveRoute && !showLocationInfo {
-                floatingButtons
-                    .padding(.bottom, tabBarHeight + 20)
+            // Botones flotantes (ocultar cuando búsqueda está activa o se muestra location info)
+            if !isSearchFocused && !showLocationInfo {
+                if hasActiveRoute {
+                    airQualityToggleButton
+                        .padding(.top, AppConstants.safeAreaTop + 20)
+                } else {
+                    floatingButtons
+                        .padding(.bottom, tabBarHeight + 20)
+                }
             }
         }
         .ignoresSafeArea()
@@ -575,8 +593,26 @@ struct EnhancedMapView: View {
             if let location = newLocation {
                 searchManager.updateSearchRegion(center: location)
 
+                // Actualizar navegación si está activa
+                if isInNavigationMode {
+                    navigationManager.updateUserLocation(location, speed: locationManager.speed)
+
+                    // Actualizar cámara para seguir al usuario en navegación (modo 3D)
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        camera = .camera(
+                            MapCamera(
+                                centerCoordinate: location,
+                                distance: 1000,
+                                heading: locationManager.heading,
+                                pitch: 60
+                            )
+                        )
+                    }
+                }
+
                 // Actualizar grid de calidad del aire si está activo
-                if showAirQualityLayer {
+                if showAirQualityLayer && !isInNavigationMode {
+                    // Solo actualizar grid si NO está navegando (en navegación los círculos son fijos)
                     // Determinar centro del grid según punto de referencia
                     let gridCenter: CLLocationCoordinate2D
 
@@ -873,6 +909,39 @@ struct EnhancedMapView: View {
         }
     }
 
+    private var airQualityToggleButton: some View {
+        VStack {
+            HStack {
+                Spacer()
+
+                FloatingActionButton(
+                    icon: "aqi.medium",
+                    color: showAirQualityLayer ? .mint : .gray,
+                    size: 50,
+                    isPrimary: showAirQualityLayer
+                ) {
+                    toggleAirQualityLayer()
+                }
+                .shadow(color: Color.mint.opacity(0.3), radius: 10, x: 0, y: 6)
+                .padding(.trailing, 20)
+            }
+
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var airQualityDashboard: some View {
+        let navAction: (() -> Void)? = hasActiveRouteForNav ? { self.startNavigation() } : nil
+        EnhancedAirQualityDashboard(
+            isExpanded: $showAirQualityLegend,
+            statistics: airQualityGridManager.getStatistics(),
+            referencePoint: airQualityReferencePoint,
+            activeRoute: routeManager.currentScoredRoute,
+            onStartNavigation: navAction
+        )
+    }
+
     // MARK: - Helper Methods
 
     private func handleMapTap(at screenPoint: CGPoint, with proxy: MapProxy) {
@@ -1051,6 +1120,11 @@ struct EnhancedMapView: View {
 
     private func clearRoute() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            // Si está en navegación, detenerla primero
+            if isInNavigationMode {
+                stopNavigation()
+            }
+
             destination = nil
             routeManager.clearRoute()
             selectedRouteIndex = nil
@@ -1061,6 +1135,78 @@ struct EnhancedMapView: View {
                 print("🔄 Restaurando grid de calidad del aire centrado en ubicación del usuario")
             }
         }
+    }
+
+    // MARK: - Navigation Methods
+
+    private func startNavigation() {
+        guard let scoredRoute = routeManager.currentScoredRoute ?? routeManager.allScoredRoutes.first else {
+            print("❌ No hay ruta para iniciar navegación")
+            return
+        }
+
+        print("🧭 Iniciando navegación con ruta seleccionada...")
+
+        // Iniciar navegación con NavigationManager
+        navigationManager.startNavigation(route: scoredRoute, gridManager: airQualityGridManager)
+
+        // Activar modo navegación
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isInNavigationMode = true
+            routeManager.isInNavigationMode = true
+        }
+
+        // Asegurar que la capa de calidad del aire esté activa
+        if !showAirQualityLayer {
+            showAirQualityLayer = true
+        }
+
+        // Configurar cámara en modo 3D centrada en usuario con heading
+        if let userLocation = locationManager.userLocation {
+            withAnimation(.easeInOut(duration: 1.0)) {
+                camera = .camera(
+                    MapCamera(
+                        centerCoordinate: userLocation,
+                        distance: 1000,
+                        heading: locationManager.heading,
+                        pitch: 60
+                    )
+                )
+            }
+        }
+
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        print("✅ Navegación iniciada - Modo 3D activado")
+    }
+
+    private func stopNavigation() {
+        print("🛑 Deteniendo navegación...")
+
+        navigationManager.stopNavigation()
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isInNavigationMode = false
+            routeManager.isInNavigationMode = false
+        }
+
+        // Volver a vista normal del mapa
+        if let userLocation = locationManager.userLocation {
+            withAnimation(.easeInOut(duration: 1.0)) {
+                camera = .camera(
+                    MapCamera(
+                        centerCoordinate: userLocation,
+                        distance: 2000,
+                        heading: 0,
+                        pitch: 0
+                    )
+                )
+            }
+        }
+
+        print("✅ Navegación detenida - Vista normal restaurada")
     }
 
     private func applyRoutePreferences() {
