@@ -407,7 +407,7 @@ struct EnhancedMapView: View {
             }
 
             // Enhanced Air Quality Dashboard (superior derecha)
-            if showAirQualityLayer && !isSearchFocused {
+            if showAirQualityLayer && !isSearchFocused && !showLocationInfo {
                 VStack {
                     HStack {
                         Spacer()
