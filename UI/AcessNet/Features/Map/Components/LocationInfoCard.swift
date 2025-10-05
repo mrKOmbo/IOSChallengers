@@ -328,7 +328,7 @@ struct LocationInfoCard: View {
                     Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
                         .font(.system(size: 18, weight: .semibold))
 
-                    Text("Calcular Ruta")
+                    Text("Calculate Route")
                         .font(.subheadline.weight(.bold))
                 }
                 .foregroundStyle(.white)
@@ -370,19 +370,15 @@ struct LocationInfoCard: View {
                     Image(systemName: "aqi.medium")
                         .font(.system(size: 18, weight: .semibold))
 
-                    Text("Ver Calidad del Aire")
+                    Text("View Air Quality")
                         .font(.subheadline.weight(.bold))
                 }
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.teal, Color.teal.opacity(0.85)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(.clear)
+                .background(
+                    Color.teal.opacity(0.2)
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(
