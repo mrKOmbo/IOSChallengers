@@ -1186,6 +1186,19 @@ struct EnhancedMapView: View {
                 airQualityGridManager.updateGrid(center: userLocation)
                 print("🔄 Restaurando grid de calidad del aire centrado en ubicación del usuario")
             }
+
+            // Alejar la cámara a vista normal
+            if let userLocation = locationManager.userLocation {
+                camera = .camera(
+                    MapCamera(
+                        centerCoordinate: userLocation,
+                        distance: 1000,  // Vista normal alejada
+                        heading: locationManager.heading,
+                        pitch: 60
+                    )
+                )
+                print("📷 Cámara restaurada a vista normal")
+            }
         }
     }
 
