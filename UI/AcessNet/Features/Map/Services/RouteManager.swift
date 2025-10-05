@@ -44,6 +44,9 @@ class RouteManager: ObservableObject {
     /// Indica si está en modo navegación activa
     @Published var isInNavigationMode: Bool = false
 
+    /// Indica si las rutas necesitan re-análisis de calidad del aire
+    @Published private(set) var needsAirQualityReanalysis: Bool = false
+
     // MARK: - Private Properties
 
     private var currentTask: Task<Void, Never>?
@@ -142,6 +145,25 @@ class RouteManager: ObservableObject {
             return
         }
         calculateRoute(from: newOrigin, to: destination)
+    }
+
+    /// Re-analiza las rutas existentes con zonas de calidad del aire actualizadas
+    func reanalyzeWithAirQuality(zones: [AirQualityZone]) {
+        guard !allScoredRoutes.isEmpty else {
+            print("⚠️ No hay rutas para re-analizar")
+            return
+        }
+
+        print("🔄 Re-analizando \(allScoredRoutes.count) rutas con \(zones.count) zonas de aire...")
+
+        // Actualizar zonas en el optimizador
+        updateAirQualityZones(zones)
+
+        // Re-analizar en background
+        currentTask?.cancel()
+        currentTask = Task { @MainActor in
+            await performReanalysis()
+        }
     }
 
     // MARK: - Private Methods
@@ -268,6 +290,9 @@ class RouteManager: ObservableObject {
         // Actualizar todas las rutas con scoring
         allScoredRoutes = optimizedRoutes
 
+        // Marcar que necesita re-análisis de aire (las zonas se generarán después)
+        needsAirQualityReanalysis = true
+
         // Seleccionar la mejor ruta
         if let best = optimizedRoutes.first {
             currentScoredRoute = best
@@ -289,6 +314,53 @@ class RouteManager: ObservableObject {
         }
 
         optimizationProgress = 1.0
+    }
+
+    /// Re-analiza rutas existentes con zonas de aire actualizadas
+    @MainActor
+    private func performReanalysis() async {
+        print("🔄 Iniciando re-análisis de \(allScoredRoutes.count) rutas...")
+
+        // Extraer RouteInfo de las rutas existentes
+        let routes = allScoredRoutes.map { $0.routeInfo }
+
+        guard let firstRoute = routes.first,
+              let origin = firstRoute.route.polyline.coordinates().first,
+              let destination = firstRoute.route.polyline.coordinates().last else {
+            print("❌ No se puede re-analizar: rutas inválidas")
+            return
+        }
+
+        // Re-analizar usando RouteOptimizer con zonas actualizadas
+        let reanalyzedRoutes = await routeOptimizer.reanalyzeExistingRoutes(
+            routes: routes,
+            from: origin,
+            to: destination
+        )
+
+        // Actualizar rutas con nuevos scores
+        allScoredRoutes = reanalyzedRoutes
+        selectedRouteIndex = 0
+
+        // Seleccionar la mejor ruta
+        if let best = reanalyzedRoutes.first {
+            currentScoredRoute = best
+            currentRoute = best.routeInfo
+
+            // Alternativas
+            alternateScoredRoutes = Array(reanalyzedRoutes.dropFirst())
+            alternateRoutes = alternateScoredRoutes.map { $0.routeInfo }
+
+            // Log resultado
+            print("✅ Re-análisis completado - Nueva mejor ruta:")
+            print("   - \(best.routeInfo.distanceFormatted), \(best.routeInfo.timeFormatted)")
+            print("   - AQI promedio: \(Int(best.averageAQI))")
+            print("   - Air Score: \(Int(best.airQualityScore))/100")
+            print("   - Combined Score: \(Int(best.combinedScore))/100")
+        }
+
+        // Marcar que el re-análisis está completo
+        needsAirQualityReanalysis = false
     }
 
     /// Realiza scoring avanzado con datos de calidad del aire e incidentes (LEGACY)

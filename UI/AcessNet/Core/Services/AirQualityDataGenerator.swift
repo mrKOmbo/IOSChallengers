@@ -79,31 +79,55 @@ class AirQualityDataGenerator {
 
     // MARK: - Private Calculation Methods
 
-    /// Calcula el AQI base según la zona geográfica
+    /// Calcula el AQI base según la zona geográfica con alta granularidad
     private func calculateBaseAQI(for coordinate: CLLocationCoordinate2D) -> Double {
-        // Usar hash de coordenadas para determinar "zona" (consistente por ubicación)
-        let latHash = Int(abs(coordinate.latitude * 1000)) % 100
-        let lonHash = Int(abs(coordinate.longitude * 1000)) % 100
-        let zoneHash = (latHash + lonHash) % 100
+        // GRANULARIDAD MEJORADA: usar multiplicador de 100000 para ~11 metros de precisión
+        // Esto permite que rutas a cientos de metros de distancia tengan AQI diferentes
+        let latFine = Int(abs(coordinate.latitude * 100000)) % 1000
+        let lonFine = Int(abs(coordinate.longitude * 100000)) % 1000
 
-        // Determinar tipo de zona según hash
-        switch zoneHash {
-        case 0..<20:
-            // Zona Rural Limpia (20%)
-            return Double.random(in: 15...40)
-        case 20..<45:
-            // Zona Suburbana (25%)
-            return Double.random(in: 30...70)
-        case 45..<75:
-            // Zona Urbana Media (30%)
-            return Double.random(in: 50...100)
-        case 75..<90:
-            // Zona Urbana Alta Contaminación (15%)
-            return Double.random(in: 80...130)
-        default:
-            // Zona Industrial/Crítica (10%)
-            return Double.random(in: 100...150)
+        // Crear "centro urbano ficticio" usando las coordenadas base
+        let urbanCenterLat = floor(coordinate.latitude * 10) / 10  // Centro cada ~11 km
+        let urbanCenterLon = floor(coordinate.longitude * 10) / 10
+
+        // Calcular distancia al "centro urbano" (valores 0-1, donde 0 = centro, 1 = periferia)
+        let distFromCenter = sqrt(
+            pow((coordinate.latitude - urbanCenterLat) * 100, 2) +
+            pow((coordinate.longitude - urbanCenterLon) * 100, 2)
+        )
+        let normalizedDistance = min(1.0, distFromCenter / 10.0)  // Normalizar a 0-1
+
+        // Crear patrón de "corredores" usando funciones trigonométricas
+        let corridorPattern = sin(coordinate.latitude * 1000) * cos(coordinate.longitude * 1000)
+        let corridorFactor = (corridorPattern + 1.0) / 2.0  // Normalizar a 0-1
+
+        // Crear hotspots de contaminación basados en coordenadas finas
+        let hotspotHash = (latFine + lonFine) % 100
+        let isHotspot = hotspotHash < 15  // 15% de probabilidad de hotspot
+
+        // Calcular AQI base combinando factores
+        var baseAQI: Double
+
+        if isHotspot {
+            // Hotspot de contaminación (zona industrial, intersección muy transitada)
+            baseAQI = Double.random(in: 90...140)
+        } else {
+            // AQI varía según distancia al centro (centro = más contaminado)
+            let centerAQI = 95.0  // AQI en el centro urbano
+            let peripheryAQI = 25.0  // AQI en la periferia
+
+            // Interpolar entre centro y periferia
+            baseAQI = centerAQI - (normalizedDistance * (centerAQI - peripheryAQI))
+
+            // Aplicar factor de corredor (algunas calles son más limpias que otras)
+            baseAQI = baseAQI * (0.7 + corridorFactor * 0.6)  // Variación 70%-130%
+
+            // Añadir variación micro-local
+            let microVariation = Double((latFine + lonFine) % 30) - 15  // -15 a +15
+            baseAQI += microVariation
         }
+
+        return baseAQI
     }
 
     /// Calcula el factor temporal (hora del día, día de la semana)

@@ -48,9 +48,9 @@ class RouteOptimizer: ObservableObject {
 
     /// Configuración de optimización
     struct OptimizationConfig {
-        var timeWeight: Double = 0.4
+        var timeWeight: Double = 0.2        // Priorizar aire por defecto
         var safetyWeight: Double = 0.3
-        var airQualityWeight: Double = 0.3
+        var airQualityWeight: Double = 0.5  // 50% aire - prioridad principal
         var avoidHighways: Bool = false
         var considerTrafficPatterns: Bool = true
         var predictiveAnalysis: Bool = true
@@ -68,6 +68,12 @@ class RouteOptimizer: ObservableObject {
             timeWeight: 0.2,
             safetyWeight: 0.6,
             airQualityWeight: 0.2
+        )
+
+        static let cleanest = OptimizationConfig(
+            timeWeight: 0.1,
+            safetyWeight: 0.1,
+            airQualityWeight: 0.8  // 80% calidad del aire
         )
 
         static let healthiest = OptimizationConfig(
@@ -158,6 +164,13 @@ class RouteOptimizer: ObservableObject {
                 rankPosition: nil
             )
 
+            // Log detallado de análisis de ruta
+            print("📊 Ruta \(index + 1) analizada:")
+            print("   - AQI promedio: \(String(format: "%.1f", routeAirQuality?.averageAQI ?? 0))")
+            print("   - Segmentos aire: \(routeAirQuality?.segments.count ?? 0)")
+            print("   - Safety score: \(String(format: "%.1f", avgSafetyScore))")
+            print("   - Incidentes: \(routeIncidents.count)")
+
             optimizedRoutes.append(scoredRoute)
         }
 
@@ -165,7 +178,8 @@ class RouteOptimizer: ObservableObject {
         optimizedRoutes.sort { $0.combinedScore > $1.combinedScore }
 
         // Asignar rankPositions después de ordenar (1 = mejor ruta)
-        let fastestTime = optimizedRoutes.first?.routeInfo.expectedTravelTime ?? 600
+        // CORREGIDO: usar .min() para obtener el tiempo más rápido real
+        let fastestTime = optimizedRoutes.map { $0.routeInfo.expectedTravelTime }.min() ?? 600
         let cleanestAQI = optimizedRoutes.compactMap { $0.airQualityAnalysis?.averageAQI }.min() ?? 50
 
         var rankedRoutes: [ScoredRoute] = []
@@ -184,10 +198,110 @@ class RouteOptimizer: ObservableObject {
             rankedRoutes.append(rankedRoute)
         }
 
+        // Log final de scores de todas las rutas
+        print("\n🏆 SCORES FINALES DE RUTAS (ordenadas por combinedScore):")
+        print("   Fastest time: \(Int(fastestTime))s, Cleanest AQI: \(String(format: "%.1f", cleanestAQI))")
+        for (index, route) in rankedRoutes.enumerated() {
+            print("\n   Ruta #\(index + 1):")
+            print("   - Time Score: \(String(format: "%.1f", route.timeScore))/100")
+            print("   - Air Score: \(String(format: "%.1f", route.airQualityScore))/100")
+            print("   - Safety Score: \(String(format: "%.1f", route.safetyScore))/100")
+            print("   - Combined Score: \(String(format: "%.1f", route.combinedScore))/100 ⭐")
+            print("   - AQI: \(String(format: "%.1f", route.averageAQI))")
+        }
+        print("")
+
         isOptimizing = false
         optimizationProgress = 1.0
 
         return Array(rankedRoutes.prefix(config.maxAlternatives))
+    }
+
+    /// Re-analiza rutas existentes con zonas de aire actualizadas
+    @MainActor
+    func reanalyzeExistingRoutes(
+        routes: [RouteInfo],
+        from origin: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D
+    ) async -> [ScoredRoute] {
+
+        print("🔄 Re-analizando \(routes.count) rutas con zonas actualizadas...")
+
+        var reanalyzedRoutes: [ScoredRoute] = []
+
+        for (index, route) in routes.enumerated() {
+            // Analizar aire para esta ruta (AHORA con zonas actualizadas)
+            let routeAirQuality = analyzeAirQualityForRoute(route: route)
+
+            // Analizar incidentes y segmentos
+            let routeIncidents = findIncidentsNearRoute(route: route)
+            let segments = await evaluateRouteSegments(route: route)
+            let avgSafetyScore = segments.map { $0.safetyScore }.reduce(0, +) / Double(max(segments.count, 1))
+
+            let incidentAnalysis = createIncidentAnalysis(
+                incidents: routeIncidents,
+                safetyScore: avgSafetyScore
+            )
+
+            // Log de análisis individual
+            print("   📊 Ruta \(index + 1) re-analizada:")
+            print("      - AQI: \(String(format: "%.1f", routeAirQuality?.averageAQI ?? 0))")
+            print("      - Segmentos: \(routeAirQuality?.segments.count ?? 0)")
+            print("      - Safety: \(String(format: "%.1f", avgSafetyScore))")
+
+            // Crear ScoredRoute temporal (con valores incorrectos de fastestTime/cleanestAQI)
+            let scoredRoute = ScoredRoute(
+                routeInfo: route,
+                airQualityAnalysis: routeAirQuality,
+                incidentAnalysis: incidentAnalysis,
+                fastestTime: route.expectedTravelTime,
+                cleanestAQI: routeAirQuality?.averageAQI ?? 50,
+                safestSafetyScore: avgSafetyScore,
+                preference: mapConfigToPreference(),
+                rankPosition: nil
+            )
+
+            reanalyzedRoutes.append(scoredRoute)
+        }
+
+        // Ordenar por score combinado
+        reanalyzedRoutes.sort { $0.combinedScore > $1.combinedScore }
+
+        // Calcular valores correctos de fastestTime y cleanestAQI
+        let fastestTime = reanalyzedRoutes.map { $0.routeInfo.expectedTravelTime }.min() ?? 600
+        let cleanestAQI = reanalyzedRoutes.compactMap { $0.airQualityAnalysis?.averageAQI }.min() ?? 50
+
+        // Re-crear ScoredRoutes con valores correctos
+        var rankedRoutes: [ScoredRoute] = []
+        for (index, route) in reanalyzedRoutes.enumerated() {
+            let rankedRoute = ScoredRoute(
+                id: route.id,
+                routeInfo: route.routeInfo,
+                airQualityAnalysis: route.airQualityAnalysis,
+                incidentAnalysis: route.incidentAnalysis,
+                fastestTime: fastestTime,
+                cleanestAQI: cleanestAQI,
+                safestSafetyScore: route.safetyScore,
+                preference: route.preference,
+                rankPosition: index + 1
+            )
+            rankedRoutes.append(rankedRoute)
+        }
+
+        // Log final
+        print("\n🏆 RE-ANÁLISIS COMPLETADO:")
+        print("   Fastest time: \(Int(fastestTime))s, Cleanest AQI: \(String(format: "%.1f", cleanestAQI))")
+        for (index, route) in rankedRoutes.enumerated() {
+            print("\n   Ruta #\(index + 1):")
+            print("   - Time Score: \(String(format: "%.1f", route.timeScore))/100")
+            print("   - Air Score: \(String(format: "%.1f", route.airQualityScore))/100")
+            print("   - Safety Score: \(String(format: "%.1f", route.safetyScore))/100")
+            print("   - Combined Score: \(String(format: "%.1f", route.combinedScore))/100 ⭐")
+            print("   - AQI: \(String(format: "%.1f", route.averageAQI))")
+        }
+        print("")
+
+        return rankedRoutes
     }
 
     /// Calcula zonas de evitación basadas en incidentes y calidad del aire

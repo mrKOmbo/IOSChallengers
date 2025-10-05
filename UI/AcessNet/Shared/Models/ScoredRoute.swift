@@ -191,19 +191,23 @@ struct RouteScoring {
     ///   - cleanestAQI: AQI de la ruta más limpia
     /// - Returns: Score de 0 a 100 (100 = mejor aire)
     static func calculateAirQualityScore(actualAQI: Double, cleanestAQI: Double) -> Double {
-        guard actualAQI > 0 else { return 50.0 }
+        guard actualAQI > 0, cleanestAQI > 0 else { return 50.0 }
 
-        // Invertir AQI: cuanto menor AQI, mejor score
-        // Score = 100 * (1 - AQI/500)
-        // AQI 0 → 100, AQI 500 → 0
-        let baseScore = 100 * (1 - actualAQI / 500)
+        // Scoring RELATIVO: comparar contra la ruta más limpia
+        // Esto crea diferencias claras entre rutas para mejor etiquetado
 
-        // Normalizar respecto a la ruta más limpia (opcional, para comparación relativa)
-        // Si queremos scoring absoluto, retornar baseScore directamente
-        // Si queremos scoring relativo entre rutas, usar el cleanestAQI
+        // Calcular score base para ambas rutas
+        let actualScore = 100 * (1 - actualAQI / 500)   // Ruta actual
+        let cleanScore = 100 * (1 - cleanestAQI / 500)  // Ruta más limpia
 
-        // Limitar entre 0 y 100
-        return max(0, min(100, baseScore))
+        // Normalizar: la más limpia = 100, el resto proporcional
+        if cleanScore > 0 {
+            let normalized = (actualScore / cleanScore) * 100
+            return max(0, min(100, normalized))
+        }
+
+        // Fallback: usar score absoluto
+        return max(0, min(100, actualScore))
     }
 
     /// Calcula el score combinado según la preferencia del usuario
@@ -378,7 +382,7 @@ extension RoutePreference {
             return (0.0, 1.0, 0.0)  // 100% aire
 
         case .balanced:
-            return (0.4, 0.4, 0.2)  // 40% tiempo, 40% aire, 20% safety
+            return (0.2, 0.5, 0.3)  // 20% tiempo, 50% aire, 30% safety - Prioriza aire limpio
 
         case .healthOptimized:
             return (0.2, 0.5, 0.3)  // 20% tiempo, 50% aire, 30% safety

@@ -231,6 +231,9 @@ struct RouteCardsSelector: View {
         let fastestIndex = routes.enumerated().max(by: { $0.element.timeScore < $1.element.timeScore })?.offset
         let cleanestIndex = routes.enumerated().max(by: { $0.element.airQualityScore < $1.element.airQualityScore })?.offset
 
+        print("🔍 Route \(index): Safety=\(route.safetyScore), Time=\(route.timeScore), Air=\(route.airQualityScore)")
+        print("🏆 Best indices - Fastest: \(fastestIndex ?? -1), Cleanest: \(cleanestIndex ?? -1), Safest: \(safestIndex ?? -1)")
+
         // Calcular diferencias entre mejor y peor ruta
         let safetyScores = routes.map { $0.safetyScore }
         let timeScores = routes.map { $0.timeScore }
@@ -240,19 +243,25 @@ struct RouteCardsSelector: View {
         let timeDifference = (timeScores.max() ?? 0) - (timeScores.min() ?? 0)
         let airDifference = (airScores.max() ?? 0) - (airScores.min() ?? 0)
 
-        // Umbral reducido a 2 puntos para ser más sensible
-        let threshold: Double = 2.0
+        print("📊 Differences - Safety: \(safetyDifference), Time: \(timeDifference), Air: \(airDifference)")
+
+        // Umbral mínimo de diferencia - prácticamente cualquier diferencia cuenta
+        let threshold: Double = 0.01
 
         // Asignar etiqueta especial solo a UNA ruta (la que tiene la característica más dominante)
-        // Prioridad: Safety > Speed > Air Quality
-        if index == safestIndex && safetyDifference >= threshold {
-            return .safest
-        } else if index == fastestIndex && timeDifference >= threshold && index != safestIndex {
+        // Prioridad: Speed > Air Quality > Safety
+        if index == fastestIndex && timeDifference >= threshold {
+            print("✅ Route \(index) is FASTEST")
             return .fastest
-        } else if index == cleanestIndex && airDifference >= threshold && index != safestIndex && index != fastestIndex {
+        } else if index == cleanestIndex && airDifference >= threshold && index != fastestIndex {
+            print("✅ Route \(index) is CLEANEST")
             return .cleanest
+        } else if index == safestIndex && safetyDifference >= threshold && index != fastestIndex && index != cleanestIndex {
+            print("✅ Route \(index) is SAFEST")
+            return .safest
         }
 
+        print("⭐ Route \(index) is RECOMMENDED")
         // Todas las demás rutas simplemente son "Recommended"
         return .primary
     }

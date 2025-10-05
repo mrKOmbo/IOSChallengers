@@ -597,14 +597,14 @@ struct EnhancedMapView: View {
                 if isInNavigationMode {
                     navigationManager.updateUserLocation(location, speed: locationManager.speed)
 
-                    // Actualizar cámara para seguir al usuario en navegación (modo 3D)
+                    // Actualizar cámara para seguir al usuario en navegación (modo 2D con heading)
                     withAnimation(.easeOut(duration: 0.5)) {
                         camera = .camera(
                             MapCamera(
                                 centerCoordinate: location,
                                 distance: 1000,
-                                heading: locationManager.heading,
-                                pitch: 60
+                                heading: locationManager.heading,  // Sigue la dirección del celular
+                                pitch: 0  // Modo 2D sin inclinación
                             )
                         )
                     }
@@ -687,6 +687,13 @@ struct EnhancedMapView: View {
             airQualityGridManager.updateZonesAlongRoutes(polylines: allPolylines)
 
             print("🗺️ Rutas calculadas: generando círculos de calidad del aire a lo largo de \(routes.count) rutas")
+        }
+        .onReceive(airQualityGridManager.$zones) { zones in
+            // Cuando las zonas se actualizan, re-analizar rutas si es necesario
+            guard !zones.isEmpty, routeManager.needsAirQualityReanalysis else { return }
+
+            print("🔄 Zonas de aire actualizadas (\(zones.count)) - Re-analizando rutas...")
+            routeManager.reanalyzeWithAirQuality(zones: zones)
         }
     }
 
@@ -964,56 +971,135 @@ struct EnhancedMapView: View {
         // Centrar cámara en el punto seleccionado
         centerCamera(on: coordinate, distance: 800)
 
-        // Generar datos de calidad del aire simulados para esta ubicación
-        let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
-            for: coordinate,
-            includeExtendedMetrics: true
-        )
+        // Obtener datos de calidad del aire del BACKEND REAL
+        Task {
+            do {
+                print("\n👆 ===== LONG PRESS EN MAPA =====")
+                print("📍 Coordenadas: \(coordinate.latitude), \(coordinate.longitude)")
 
-        print("📊 AQI generado para \(coordinate.latitude), \(coordinate.longitude): \(Int(airQuality.aqi)) (\(airQuality.level.rawValue))")
+                // Consultar backend real
+                let airQuality = try await AirQualityAPIService.shared.getCurrentAQI(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
 
-        // Obtener información del lugar con reverse geocoding
-        searchManager.reverseGeocode(coordinate: coordinate) { address in
-            DispatchQueue.main.async {
-                // Calcular distancia desde el usuario
-                let distanceText: String
-                if let userLocation = locationManager.userLocation {
-                    let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
-                    let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                    let distance = userCLLocation.distance(from: selectedCLLocation)
+                // Obtener información del lugar con reverse geocoding
+                await MainActor.run {
+                    searchManager.reverseGeocode(coordinate: coordinate) { address in
+                        DispatchQueue.main.async {
+                            // Calcular distancia desde el usuario
+                            let distanceText: String
+                            if let userLocation = locationManager.userLocation {
+                                let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                                let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                                let distance = userCLLocation.distance(from: selectedCLLocation)
 
-                    if distance < 1000 {
-                        distanceText = String(format: "%.0f m de tu ubicación", distance)
-                    } else {
-                        distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                                if distance < 1000 {
+                                    distanceText = String(format: "%.0f m de tu ubicación", distance)
+                                } else {
+                                    distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                                }
+                            } else {
+                                distanceText = "Ubicación desconocida"
+                            }
+
+                            // Dividir dirección para obtener nombre y detalles
+                            let parsedAddress = splitAddress(address)
+
+                            // Crear LocationInfo con datos REALES del backend
+                            let locationInfo = LocationInfo(
+                                coordinate: coordinate,
+                                title: parsedAddress.title,
+                                subtitle: parsedAddress.subtitle,
+                                distanceFromUser: distanceText,
+                                airQuality: airQuality
+                            )
+
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                selectedLocationInfo = locationInfo
+                                showLocationInfo = true
+                            }
+
+                            // Actualizar destino para mostrar etiqueta adecuada en el mapa
+                            destination = DestinationPoint(
+                                coordinate: coordinate,
+                                title: parsedAddress.title,
+                                subtitle: parsedAddress.subtitle
+                            )
+
+                            print("✅ LocationInfo mostrado con DATOS REALES")
+                            print("   Lugar: \(parsedAddress.title)")
+                            print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
+                            print("   PM2.5: \(String(format: "%.1f", airQuality.pm25)) μg/m³")
+                            print("   Health Risk: \(airQuality.healthRisk.rawValue)")
+                            print("===== END LONG PRESS =====\n")
+                        }
                     }
-                } else {
-                    distanceText = "Ubicación desconocida"
                 }
 
-                // Dividir dirección para obtener nombre y detalles
-                let parsedAddress = splitAddress(address)
+            } catch {
+                print("\n⚠️ ===== ERROR EN BACKEND (LONG PRESS) =====")
+                print("❌ Error: \(error.localizedDescription)")
+                print("   Tipo: \(type(of: error))")
+                print("🔄 Activando fallback a datos simulados...")
 
-                // Crear LocationInfo con datos enriquecidos
-                let locationInfo = LocationInfo(
-                    coordinate: coordinate,
-                    title: parsedAddress.title,
-                    subtitle: parsedAddress.subtitle,
-                    distanceFromUser: distanceText,
-                    airQuality: airQuality
+                // Fallback a datos simulados
+                let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
+                    for: coordinate,
+                    includeExtendedMetrics: true
                 )
 
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    selectedLocationInfo = locationInfo
-                    showLocationInfo = true
+                await MainActor.run {
+                    searchManager.reverseGeocode(coordinate: coordinate) { address in
+                        DispatchQueue.main.async {
+                            // Calcular distancia desde el usuario
+                            let distanceText: String
+                            if let userLocation = locationManager.userLocation {
+                                let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                                let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                                let distance = userCLLocation.distance(from: selectedCLLocation)
+
+                                if distance < 1000 {
+                                    distanceText = String(format: "%.0f m de tu ubicación", distance)
+                                } else {
+                                    distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                                }
+                            } else {
+                                distanceText = "Ubicación desconocida"
+                            }
+
+                            // Dividir dirección para obtener nombre y detalles
+                            let parsedAddress = splitAddress(address)
+
+                            // Crear LocationInfo con datos simulados (fallback)
+                            let locationInfo = LocationInfo(
+                                coordinate: coordinate,
+                                title: parsedAddress.title,
+                                subtitle: parsedAddress.subtitle,
+                                distanceFromUser: distanceText,
+                                airQuality: airQuality
+                            )
+
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                selectedLocationInfo = locationInfo
+                                showLocationInfo = true
+                            }
+
+                            // Actualizar destino para mostrar etiqueta adecuada en el mapa
+                            destination = DestinationPoint(
+                                coordinate: coordinate,
+                                title: parsedAddress.title,
+                                subtitle: parsedAddress.subtitle
+                            )
+
+                            print("⚠️ LocationInfo mostrado con DATOS SIMULADOS (fallback)")
+                            print("   Lugar: \(parsedAddress.title)")
+                            print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
+                            print("   Fuente: AirQualityDataGenerator (local)")
+                            print("===== END LONG PRESS (FALLBACK) =====\n")
+                        }
+                    }
                 }
-
-                // Actualizar destino para mostrar etiqueta adecuada en el mapa
-                destination = DestinationPoint(
-                    coordinate: coordinate,
-                    title: parsedAddress.title,
-                    subtitle: parsedAddress.subtitle
-                )
             }
         }
     }
@@ -1150,6 +1236,10 @@ struct EnhancedMapView: View {
         // Iniciar navegación con NavigationManager
         navigationManager.startNavigation(route: scoredRoute, gridManager: airQualityGridManager)
 
+        // Limpiar rutas alternativas - solo mostrar la ruta seleccionada
+        routeManager.alternateScoredRoutes = []
+        routeManager.allScoredRoutes = [scoredRoute]
+
         // Activar modo navegación
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             isInNavigationMode = true
@@ -1161,7 +1251,7 @@ struct EnhancedMapView: View {
             showAirQualityLayer = true
         }
 
-        // Configurar cámara en modo 3D centrada en usuario con heading
+        // Configurar cámara en modo 2D centrada en usuario con heading
         if let userLocation = locationManager.userLocation {
             withAnimation(.easeInOut(duration: 1.0)) {
                 camera = .camera(
@@ -1169,7 +1259,7 @@ struct EnhancedMapView: View {
                         centerCoordinate: userLocation,
                         distance: 1000,
                         heading: locationManager.heading,
-                        pitch: 60
+                        pitch: 0  // Modo 2D sin inclinación
                     )
                 )
             }
@@ -1179,7 +1269,7 @@ struct EnhancedMapView: View {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
 
-        print("✅ Navegación iniciada - Modo 3D activado")
+        print("✅ Navegación iniciada - Modo 2D activado con heading del dispositivo")
     }
 
     private func stopNavigation() {
@@ -1253,23 +1343,117 @@ struct EnhancedMapView: View {
                 return
             }
 
-            // SIEMPRE establecer destino y calcular ruta
-            setDestination(
-                at: coordinate,
-                title: result.title,
-                subtitle: result.subtitle
-            )
-
-            // Mostrar toast de confirmación
-            showRouteToast(to: result.title)
+            // Cerrar teclado
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isSearchFocused = false
+            }
 
             // Haptic feedback
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
-            // Solo cerrar teclado, mantener búsqueda
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                isSearchFocused = false
+            // Centrar cámara en el punto seleccionado
+            centerCamera(on: coordinate, distance: 800)
+
+            // Calcular distancia desde el usuario
+            let distanceText: String
+            if let userLocation = locationManager.userLocation {
+                let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                let distance = userCLLocation.distance(from: selectedCLLocation)
+
+                if distance < 1000 {
+                    distanceText = String(format: "%.0f m de tu ubicación", distance)
+                } else {
+                    distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                }
+            } else {
+                distanceText = "Ubicación desconocida"
+            }
+
+            // Obtener datos de calidad del aire del BACKEND REAL
+            Task {
+                do {
+                    print("\n🔍 ===== BÚSQUEDA DE CIUDAD =====")
+                    print("📍 Ciudad seleccionada: \(result.title)")
+                    print("   Subtítulo: \(result.subtitle)")
+                    print("   Coordenadas: \(coordinate.latitude), \(coordinate.longitude)")
+                    print("   Distancia: \(distanceText)")
+
+                    // Consultar backend real
+                    let airQuality = try await AirQualityAPIService.shared.getCurrentAQI(
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    )
+
+                    // Crear LocationInfo con datos reales
+                    await MainActor.run {
+                        let locationInfo = LocationInfo(
+                            coordinate: coordinate,
+                            title: result.title,
+                            subtitle: result.subtitle,
+                            distanceFromUser: distanceText,
+                            airQuality: airQuality
+                        )
+
+                        // Mostrar LocationInfoCard
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedLocationInfo = locationInfo
+                            showLocationInfo = true
+                        }
+
+                        // Establecer destino (sin calcular ruta todavía)
+                        destination = DestinationPoint(
+                            coordinate: coordinate,
+                            title: result.title,
+                            subtitle: result.subtitle
+                        )
+
+                        print("✅ LocationInfo mostrado con DATOS REALES")
+                        print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
+                        print("   PM2.5: \(String(format: "%.1f", airQuality.pm25)) μg/m³")
+                        print("   Health Risk: \(airQuality.healthRisk.rawValue)")
+                        print("===== END BÚSQUEDA =====\n")
+                    }
+
+                } catch {
+                    print("\n⚠️ ===== ERROR EN BACKEND =====")
+                    print("❌ Error: \(error.localizedDescription)")
+                    print("   Tipo: \(type(of: error))")
+                    print("🔄 Activando fallback a datos simulados...")
+
+                    // Fallback a datos simulados
+                    let airQuality = AirQualityDataGenerator.shared.generateAirQuality(
+                        for: coordinate,
+                        includeExtendedMetrics: true
+                    )
+
+                    await MainActor.run {
+                        let locationInfo = LocationInfo(
+                            coordinate: coordinate,
+                            title: result.title,
+                            subtitle: result.subtitle,
+                            distanceFromUser: distanceText,
+                            airQuality: airQuality
+                        )
+
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            selectedLocationInfo = locationInfo
+                            showLocationInfo = true
+                        }
+
+                        destination = DestinationPoint(
+                            coordinate: coordinate,
+                            title: result.title,
+                            subtitle: result.subtitle
+                        )
+
+                        print("⚠️ LocationInfo mostrado con DATOS SIMULADOS (fallback)")
+                        print("   AQI: \(Int(airQuality.aqi)) - \(airQuality.level.rawValue)")
+                        print("   Fuente: AirQualityDataGenerator (local)")
+                        print("===== END BÚSQUEDA (FALLBACK) =====\n")
+                    }
+                }
             }
         }
     }

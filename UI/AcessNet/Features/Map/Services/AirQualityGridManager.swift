@@ -204,6 +204,14 @@ class AirQualityGridManager: ObservableObject {
                 self.isCalculating = false
 
                 print("🛣️ Zonas a lo largo de rutas: \(newZones.count) círculos (espaciado: \(Int(spacing))m)")
+
+                // Log de rango de AQI generado
+                let aqiValues = newZones.map { $0.airQuality.aqi }
+                let minAQI = aqiValues.min() ?? 0
+                let maxAQI = aqiValues.max() ?? 0
+                let avgAQI = aqiValues.isEmpty ? 0 : aqiValues.reduce(0, +) / Double(aqiValues.count)
+                print("   💨 AQI range: \(String(format: "%.1f", minAQI)) - \(String(format: "%.1f", maxAQI)) (avg: \(String(format: "%.1f", avgAQI)))")
+
                 self.logGridStatistics()
             }
         }
