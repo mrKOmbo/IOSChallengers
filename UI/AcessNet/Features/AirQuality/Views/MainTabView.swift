@@ -70,11 +70,12 @@ struct CustomTabBar: View {
             }
         }
         .padding(.horizontal, 4)
-        .padding(.top, 12)
+        .padding(.top, 20)
+        .padding(.bottom, 20)
         .background(
             Rectangle()
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: -5)
+                .fill(selectedTab == .map ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.ultraThinMaterial))
+                .shadow(color: selectedTab == .map ? .clear : .black.opacity(0.15), radius: 12, x: 0, y: -5)
         )
     }
 }
@@ -113,3 +114,4 @@ struct TabBarButton: View {
 #Preview {
     MainTabView()
 }
+

@@ -111,6 +111,7 @@ struct EnhancedMapView: View {
     @State private var tappedCoordinate: CLLocationCoordinate2D?
     @State private var selectedAnnotation: CustomAnnotation?
     @State private var mapStyle: MapStyleType = .hybrid
+    @State private var is3DMode: Bool = false
 
     // MARK: - Routing State
     @StateObject private var routeManager = RouteManager()
@@ -130,6 +131,11 @@ struct EnhancedMapView: View {
     @State private var dashPhase: CGFloat = 0  // Marching ants
 
     private let bottomBarHeight: CGFloat = UIScreen.main.bounds.height * 0.1
+
+    // Computed property para verificar si hay ruta activa
+    private var hasActiveRoute: Bool {
+        routeManager.currentRoute != nil || routeManager.isCalculating
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -187,8 +193,37 @@ struct EnhancedMapView: View {
             }
             .padding(.top, 60)
 
+            // Top buttons (2D/3D and Map Style) - Por debajo del safe area
+            VStack {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 15) {
+                        // 2D/3D toggle button
+                        FloatingActionButton(
+                            icon: is3DMode ? "view.2d" : "view.3d",
+                            color: .green,
+                            size: 50
+                        ) {
+                            toggle3DMode()
+                        }
+
+                        // Map style toggle
+                        FloatingActionButton(
+                            icon: mapStyle.icon,
+                            color: .purple,
+                            size: 50
+                        ) {
+                            cycleMapStyle()
+                        }
+                    }
+                    .padding(.trailing, 20)
+                }
+                Spacer()
+            }
+            .padding(.top, 60)
+
             // Search Results (arriba de la barra de búsqueda)
-            if isSearchFocused && (!searchManager.searchResults.isEmpty || searchManager.isSearching) {
+            if !searchManager.searchResults.isEmpty || searchManager.isSearching {
                 VStack {
                     Spacer()
 
@@ -199,7 +234,7 @@ struct EnhancedMapView: View {
                         onSelect: handleSearchResultSelection
                     )
                     .padding(.horizontal)
-                    .padding(.bottom, bottomBarHeight + 20)
+                    .padding(.bottom, 160)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -209,65 +244,70 @@ struct EnhancedMapView: View {
                 VStack {
                     Spacer()
 
-                    if routeManager.isCalculating {
-                        CalculatingRouteView()
-                            .padding(.bottom, bottomBarHeight + 20)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else if let routeInfo = routeManager.currentRoute {
-                        RouteInfoCard(
-                            routeInfo: routeInfo,
-                            isCalculating: routeManager.isCalculating,
-                            onClear: clearRoute,
-                            onStartNavigation: nil // Opcional: implementar navegación
-                        )
-                        .padding(.horizontal)
-                        .padding(.bottom, bottomBarHeight + 20)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else if let errorMessage = routeManager.errorMessage {
-                        RouteErrorView(message: errorMessage, onDismiss: {
-                            routeManager.clearRoute()
-                        })
-                        .padding(.horizontal)
-                        .padding(.bottom, bottomBarHeight + 20)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    HStack(alignment: .bottom, spacing: 12) {
+                        // Contenido de ruta
+                        VStack(spacing: 0) {
+                            if routeManager.isCalculating {
+                                CalculatingRouteView()
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            } else if let routeInfo = routeManager.currentRoute {
+                                RouteInfoCard(
+                                    routeInfo: routeInfo,
+                                    isCalculating: routeManager.isCalculating,
+                                    onClear: clearRoute,
+                                    onStartNavigation: nil // Opcional: implementar navegación
+                                )
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                            } else if let errorMessage = routeManager.errorMessage {
+                                RouteErrorView(message: errorMessage, onDismiss: {
+                                    routeManager.clearRoute()
+                                })
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+                        }
+
+                        // Botón de ubicación al lado de la ruta
+                        if hasActiveRoute {
+                            FloatingActionButton(
+                                icon: "location.fill",
+                                color: .blue,
+                                size: 50
+                            ) {
+                                centerOnUser()
+                            }
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom, 160)
                 }
             }
 
             // Barra de búsqueda inferior
-            SearchBarView(
-                searchText: $searchManager.searchQuery,
-                isFocused: $isSearchFocused,
-                placeholder: "Where to?",
-                onSubmit: {
-                    // Opcional: submit search
-                },
-                onClear: {
-                    searchManager.clearSearch()
-                }
-            )
-            .padding(.horizontal)
-            .padding(.bottom, 10)
-            .fadeIn(delay: 0.1)
+            VStack {
+                Spacer()
+                SearchBarView(
+                    searchText: $searchManager.searchQuery,
+                    isFocused: $isSearchFocused,
+                    placeholder: "Where to?",
+                    onSubmit: {
+                        // Opcional: submit search
+                    },
+                    onClear: {
+                        searchManager.clearSearch()
+                    }
+                )
+                .padding(.horizontal)
+                .padding(.bottom, 80)
+                .fadeIn(delay: 0.1)
+            }
 
-            // Botones flotantes (ocultar cuando búsqueda está activa)
-            if !isSearchFocused {
+            // Botones flotantes (ocultar cuando búsqueda está activa o hay ruta)
+            if !isSearchFocused && !hasActiveRoute {
                 floatingButtons
-                    .padding(.bottom, bottomBarHeight + 10)
+                    .padding(.bottom, 160)
             }
         }
         .ignoresSafeArea()
-        .sheet(isPresented: $mostrarSheet, onDismiss: { tappedCoordinate = nil }) {
-            EnhancedAlertSheet(addAnnotation: { title in
-                if let coordinate = tappedCoordinate {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                        annotations.append(CustomAnnotation(coordinate: coordinate, title: title))
-                    }
-                }
-            })
-            .presentationDetents([.height(350)])
-            .presentationDragIndicator(.visible)
-        }
         .onAppear {
             // Actualizar región de búsqueda inicial
             if let location = locationManager.userLocation {
@@ -410,7 +450,6 @@ struct EnhancedMapView: View {
             .mapStyle(mapStyle.style)
             .mapControls {
                 MapCompass()
-                MapPitchToggle()
                 MapScaleView()
             }
             .onTapGesture(coordinateSpace: .local) { screenPoint in
@@ -431,26 +470,6 @@ struct EnhancedMapView: View {
                 ) {
                     centerOnUser()
                 }
-
-                // Map style toggle
-                FloatingActionButton(
-                    icon: mapStyle.icon,
-                    color: .purple,
-                    size: 50
-                ) {
-                    cycleMapStyle()
-                }
-
-                // Add alert button
-                FloatingActionButton(
-                    icon: "exclamationmark.triangle.fill",
-                    color: .yellow,
-                    size: 60,
-                    isPrimary: true
-                ) {
-                    addAlertAtUserLocation()
-                }
-                .glowEffect(color: .yellow, radius: 10)
             }
             .padding(.trailing, 20)
         }
@@ -464,13 +483,8 @@ struct EnhancedMapView: View {
         if routingMode {
             // Modo ruteo: establecer destino y calcular ruta
             setDestination(at: coordinate)
-        } else {
-            // Modo normal: mostrar sheet de alertas
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                tappedCoordinate = coordinate
-            }
-            mostrarSheet = true
         }
+        // Removido: modo de agregar alertas manualmente
     }
 
     private func centerOnUser() {
@@ -491,6 +505,23 @@ struct EnhancedMapView: View {
     private func cycleMapStyle() {
         withAnimation {
             mapStyle = mapStyle.next()
+        }
+    }
+
+    private func toggle3DMode() {
+        guard let location = locationManager.userLocation else { return }
+
+        is3DMode.toggle()
+
+        withAnimation(.easeInOut(duration: 1.0)) {
+            camera = .camera(
+                MapCamera(
+                    centerCoordinate: location,
+                    distance: 1000,
+                    heading: locationManager.heading,
+                    pitch: is3DMode ? 60 : 0
+                )
+            )
         }
     }
 
@@ -578,9 +609,8 @@ struct EnhancedMapView: View {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
-            // Limpiar búsqueda y cerrar teclado
+            // Solo cerrar teclado, mantener búsqueda
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                searchManager.clearSearch()
                 isSearchFocused = false
             }
         }
