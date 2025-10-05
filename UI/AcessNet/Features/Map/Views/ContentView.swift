@@ -533,7 +533,7 @@ struct EnhancedMapView: View {
                         DirectionalArrowView(
                             heading: arrow.heading,
                             isNext: index == 0, // Primera flecha es la siguiente
-                            size: 40
+                            size: 30
                         )
                         .bounceIn()
                     }

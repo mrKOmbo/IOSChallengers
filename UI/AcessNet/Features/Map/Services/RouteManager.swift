@@ -527,9 +527,9 @@ class RouteManager: ObservableObject {
     // MARK: - Directional Arrows
 
     /// Calcula flechas direccionales a lo largo de la ruta
-    /// - Parameter interval: Distancia entre flechas en metros (default: 150m)
+    /// - Parameter interval: Distancia entre flechas en metros (default: 300m)
     /// - Returns: Array de flechas direccionales
-    func calculateDirectionalArrows(interval: CLLocationDistance = 150) -> [RouteArrowAnnotation] {
+    func calculateDirectionalArrows(interval: CLLocationDistance = 300) -> [RouteArrowAnnotation] {
         guard let route = currentRoute?.route else {
             print("❌ calculateDirectionalArrows: No hay ruta en currentRoute")
             return []
@@ -547,7 +547,7 @@ class RouteManager: ObservableObject {
 
         var arrows: [RouteArrowAnnotation] = []
         var distanceAccumulated: CLLocationDistance = 0
-        var nextArrowDistance: CLLocationDistance = 50 // Primera flecha a 50m
+        var nextArrowDistance: CLLocationDistance = 100 // Primera flecha a 100m
 
         for i in 0..<coordinates.count - 1 {
             let coord1 = coordinates[i]
@@ -584,9 +584,9 @@ class RouteManager: ObservableObject {
 
         print("📍 Generadas \(arrows.count) flechas antes de filtrar")
 
-        // Filtrar flechas muy cerca del destino (últimos 100m)
+        // Filtrar flechas muy cerca del destino (últimos 200m)
         let totalDistance = route.distance
-        arrows = arrows.filter { $0.distanceFromStart < totalDistance - 100 }
+        arrows = arrows.filter { $0.distanceFromStart < totalDistance - 200 }
 
         print("🎯 Calculadas \(arrows.count) flechas direccionales después de filtrar")
 

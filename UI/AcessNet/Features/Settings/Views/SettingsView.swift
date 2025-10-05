@@ -108,44 +108,30 @@ struct SettingsView: View {
                         SectionHeader(title: "PERFORMANCE")
                             .padding(.bottom, 16)
 
-                        SettingsToggleRow(
-                            title: "Blob Rotation",
-                            subtitle: "Subtle rotation animation on air quality zones. Disable for smoother performance.",
-                            isOn: $appSettings.enableAirQualityRotation
-                        )
-
                         // Performance Info Card
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 8) {
-                                Image(systemName: "info.circle.fill")
+                                Image(systemName: "checkmark.circle.fill")
                                     .font(.caption)
-                                    .foregroundColor(.blue.opacity(0.8))
+                                    .foregroundColor(.green)
 
-                                Text("Performance Impact")
+                                Text("Optimized for Maximum Performance")
                                     .font(.caption.weight(.semibold))
                                     .foregroundColor(.white.opacity(0.9))
                             }
 
-                            Text("Grid: \(appSettings.totalAirQualityZones) zones • ~\(appSettings.estimatedActiveAnimations) animations")
+                            Text("Grid: \(appSettings.totalAirQualityZones) static zones • No animations")
                                 .font(.caption2)
                                 .foregroundColor(.white.opacity(0.6))
 
-                            if appSettings.isHighPerformanceMode {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.caption2)
-                                        .foregroundColor(.green)
-
-                                    Text("Optimized for best performance")
-                                        .font(.caption2)
-                                        .foregroundColor(.green.opacity(0.9))
-                                }
-                            }
+                            Text("All air quality circles are now completely static for best performance.")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
+                                .padding(.top, 4)
                         }
                         .padding()
-                        .background(Color.white.opacity(0.05))
+                        .background(Color.green.opacity(0.1))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .padding(.top, 12)
                     }
                 }
                 .padding(.horizontal)

@@ -76,71 +76,32 @@ struct AtmosphericBlobShape: Shape {
 
 // MARK: - Animated Atmospheric Blob
 
-/// Vista de blob atmosférico con animación de "respiración"
-/// Optimizado para mejor rendimiento - Sin partículas flotantes
+/// Vista de círculo estático de calidad del aire
+/// SIN animaciones para máximo rendimiento
 struct AnimatedAtmosphericBlob: View {
     let zone: AirQualityZone
     let enableRotation: Bool
 
-    @State private var breathingPhase: Double = 0
-    @State private var rotationAngle: Double = 0
-
     var body: some View {
         ZStack {
-            // Blob animado (breathing + rotation)
-            ZStack {
-                // Capa 1: Glow exterior (blur optimizado: 12→6)
-                AtmosphericBlobShape(irregularity: 0.2, phase: breathingPhase)
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                zone.color.opacity(0.4),
-                                zone.color.opacity(0.2),
-                                zone.color.opacity(0.05),
-                                .clear
-                            ],
-                            center: .center,
-                            startRadius: 20,
-                            endRadius: 60
-                        )
+            // Círculo simple estático (sin animaciones)
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            zone.color.opacity(zone.fillOpacity * 0.8),
+                            zone.color.opacity(zone.fillOpacity * 0.5),
+                            zone.color.opacity(zone.fillOpacity * 0.2),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 10,
+                        endRadius: 40
                     )
-                    .blur(radius: 6)
-                    .scaleEffect(1.3)
+                )
+                .frame(width: 80, height: 80)
 
-                // Capa 2: Blob principal con gradiente mesh (blur optimizado: 3→1.5)
-                AtmosphericBlobShape(irregularity: 0.25, phase: breathingPhase)
-                    .fill(
-                        EllipticalGradient(
-                            colors: [
-                                zone.color.opacity(zone.fillOpacity * 1.2),
-                                zone.color.opacity(zone.fillOpacity * 0.9),
-                                zone.color.opacity(zone.fillOpacity * 0.6),
-                                zone.color.opacity(zone.fillOpacity * 0.3)
-                            ],
-                            center: .center,
-                            startRadiusFraction: 0,
-                            endRadiusFraction: 0.8
-                        )
-                    )
-                    .blur(radius: 1.5)
-
-                // Capa 3: Contorno con trazo irregular (blur eliminado para performance)
-                AtmosphericBlobShape(irregularity: 0.3, phase: breathingPhase)
-                    .stroke(
-                        zone.color.opacity(0.5),
-                        style: StrokeStyle(
-                            lineWidth: 2,
-                            lineCap: .round,
-                            lineJoin: .round,
-                            dash: [8, 4],
-                            dashPhase: breathingPhase * 10
-                        )
-                    )
-            }
-            .frame(width: 80, height: 80)
-            .rotationEffect(.degrees(enableRotation ? rotationAngle : 0))
-
-            // Icono central ESTÁTICO (sin animaciones)
+            // Icono central (solo para zonas contaminadas)
             if shouldShowIcon {
                 ZStack {
                     Circle()
@@ -156,19 +117,7 @@ struct AnimatedAtmosphericBlob: View {
         }
         .frame(width: 80, height: 80)
         .onAppear {
-            print("🎨 [AnimatedAtmosphericBlob] onAppear - zone: \(zone.level), enableRotation: \(enableRotation)")
-            startBreathingAnimation()
-            if enableRotation {
-                startRotationAnimation()
-            }
-        }
-        .onChange(of: enableRotation) { _, newValue in
-            print("🔄 [AnimatedAtmosphericBlob] onChange enableRotation: \(newValue)")
-            if newValue {
-                startRotationAnimation()
-            } else {
-                rotationAngle = 0
-            }
+            print("🎨 [StaticAirQualityCircle] onAppear - zone: \(zone.level)")
         }
     }
 
@@ -176,30 +125,6 @@ struct AnimatedAtmosphericBlob: View {
 
     private var shouldShowIcon: Bool {
         zone.level == .unhealthy || zone.level == .severe || zone.level == .hazardous
-    }
-
-    // MARK: - Animations (Optimizadas para rendimiento)
-
-    private func startBreathingAnimation() {
-        print("💨 [AnimatedAtmosphericBlob] Iniciando breathing animation (8.0s)")
-        // Duración aumentada: 4.0s → 8.0s (reduce frecuencia de re-render)
-        withAnimation(
-            .easeInOut(duration: 8.0)
-            .repeatForever(autoreverses: true)
-        ) {
-            breathingPhase = .pi * 2
-        }
-    }
-
-    private func startRotationAnimation() {
-        print("🔄 [AnimatedAtmosphericBlob] Iniciando rotation animation (120.0s)")
-        // Duración aumentada: 60.0s → 120.0s (rotación más sutil y eficiente)
-        withAnimation(
-            .linear(duration: 120.0)
-            .repeatForever(autoreverses: false)
-        ) {
-            rotationAngle = 360
-        }
     }
 }
 
