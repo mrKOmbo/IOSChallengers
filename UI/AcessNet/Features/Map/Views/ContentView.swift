@@ -112,6 +112,23 @@ struct EnhancedMapView: View {
     @State private var selectedAnnotation: CustomAnnotation?
     @State private var mapStyle: MapStyleType = .hybrid
 
+    // MARK: - Routing State
+    @StateObject private var routeManager = RouteManager()
+    @State private var routingMode: Bool = false
+    @State private var destination: DestinationPoint?
+
+    // MARK: - Search State
+    @StateObject private var searchManager = LocationSearchManager()
+    @FocusState private var isSearchFocused: Bool
+    @State private var showRouteToast = false
+    @State private var routeToastMessage = ""
+
+    // MARK: - Route Arrows State
+    @State private var routeArrows: [RouteArrowAnnotation] = []
+
+    // MARK: - Route Animation State (Optimizado)
+    @State private var dashPhase: CGFloat = 0  // Marching ants
+
     private let bottomBarHeight: CGFloat = UIScreen.main.bounds.height * 0.1
 
     var body: some View {
@@ -119,10 +136,47 @@ struct EnhancedMapView: View {
             // Mapa principal mejorado
             enhancedMapView
 
+            // Dimmer de fondo cuando búsqueda está activa
+            if isSearchFocused {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isSearchFocused = false
+                            searchManager.clearSearch()
+                        }
+                    }
+                    .transition(.opacity)
+            }
+
+            // Route Toast Notification
+            if showRouteToast {
+                VStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.blue)
+
+                        Text(routeToastMessage)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                    .padding(.top, 60)
+
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             // Speed Indicator (top left)
             VStack {
                 HStack {
-                    if locationManager.isMoving {
+                    if locationManager.isMoving && !isSearchFocused {
                         CompactSpeedIndicator(speed: locationManager.speedKmh)
                             .padding(.leading)
                             .fadeIn(delay: 0.2)
@@ -133,14 +187,74 @@ struct EnhancedMapView: View {
             }
             .padding(.top, 60)
 
-            // Barra de búsqueda inferior
-            ImprovedSearchBar()
-                .frame(height: bottomBarHeight)
-                .fadeIn(delay: 0.1)
+            // Search Results (arriba de la barra de búsqueda)
+            if isSearchFocused && (!searchManager.searchResults.isEmpty || searchManager.isSearching) {
+                VStack {
+                    Spacer()
 
-            // Botones flotantes
-            floatingButtons
-                .padding(.bottom, bottomBarHeight + 10)
+                    SearchResultsView(
+                        results: searchManager.searchResults,
+                        isSearching: searchManager.isSearching,
+                        userLocation: locationManager.userLocation,
+                        onSelect: handleSearchResultSelection
+                    )
+                    .padding(.horizontal)
+                    .padding(.bottom, bottomBarHeight + 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+
+            // Route Info Card o Calculating Indicator
+            if !isSearchFocused {
+                VStack {
+                    Spacer()
+
+                    if routeManager.isCalculating {
+                        CalculatingRouteView()
+                            .padding(.bottom, bottomBarHeight + 20)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if let routeInfo = routeManager.currentRoute {
+                        RouteInfoCard(
+                            routeInfo: routeInfo,
+                            isCalculating: routeManager.isCalculating,
+                            onClear: clearRoute,
+                            onStartNavigation: nil // Opcional: implementar navegación
+                        )
+                        .padding(.horizontal)
+                        .padding(.bottom, bottomBarHeight + 20)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if let errorMessage = routeManager.errorMessage {
+                        RouteErrorView(message: errorMessage, onDismiss: {
+                            routeManager.clearRoute()
+                        })
+                        .padding(.horizontal)
+                        .padding(.bottom, bottomBarHeight + 20)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+            }
+
+            // Barra de búsqueda inferior
+            SearchBarView(
+                searchText: $searchManager.searchQuery,
+                isFocused: $isSearchFocused,
+                placeholder: "Where to?",
+                onSubmit: {
+                    // Opcional: submit search
+                },
+                onClear: {
+                    searchManager.clearSearch()
+                }
+            )
+            .padding(.horizontal)
+            .padding(.bottom, 10)
+            .fadeIn(delay: 0.1)
+
+            // Botones flotantes (ocultar cuando búsqueda está activa)
+            if !isSearchFocused {
+                floatingButtons
+                    .padding(.bottom, bottomBarHeight + 10)
+            }
         }
         .ignoresSafeArea()
         .sheet(isPresented: $mostrarSheet, onDismiss: { tappedCoordinate = nil }) {
@@ -153,6 +267,37 @@ struct EnhancedMapView: View {
             })
             .presentationDetents([.height(350)])
             .presentationDragIndicator(.visible)
+        }
+        .onAppear {
+            // Actualizar región de búsqueda inicial
+            if let location = locationManager.userLocation {
+                searchManager.updateSearchRegion(center: location)
+            }
+        }
+        .onReceive(locationManager.$userLocation) { newLocation in
+            // Actualizar región de búsqueda cuando cambie ubicación del usuario
+            if let location = newLocation {
+                searchManager.updateSearchRegion(center: location)
+            }
+        }
+        .onReceive(routeManager.$currentRoute) { newRoute in
+            if newRoute != nil {
+                // Calcular flechas direccionales
+                routeArrows = routeManager.calculateDirectionalArrows()
+
+                // Inicializar animación de marching ants (simplificada)
+                withAnimation(.linear(duration: 2.0).repeatForever(autoreverses: false)) {
+                    dashPhase = 22
+                }
+
+                print("✅ Animación de ruta iniciada!")
+                print("   - Flechas direccionales: \(routeArrows.count)")
+
+            } else {
+                // Limpiar ruta
+                routeArrows = []
+                dashPhase = 0
+            }
         }
     }
 
@@ -187,8 +332,75 @@ struct EnhancedMapView: View {
                     }
                 }
 
+                // Destination annotation (Punto B)
+                if let dest = destination {
+                    Annotation(dest.title, coordinate: dest.coordinate) {
+                        DestinationAnnotationView()
+                            .bounceIn()
+                            .onTapGesture {
+                                // Opcional: mostrar detalles del destino
+                            }
+                    }
+                }
+
+                // 🎨 ROUTE ANIMATION - Optimizada (3 capas elegantes)
+                if let routeInfo = routeManager.currentRoute {
+
+                    // CAPA 1: Base de ruta con gradiente suave
+                    MapPolyline(routeInfo.polyline)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.blue.opacity(0.8),
+                                    Color.cyan.opacity(0.7),
+                                    Color.blue.opacity(0.8)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
+                        )
+
+                    // CAPA 2: Línea animada con marching ants elegante
+                    MapPolyline(routeInfo.polyline)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(0.7), .white.opacity(0.4)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(
+                                lineWidth: 5,
+                                lineCap: .round,
+                                lineJoin: .round,
+                                dash: [10, 12],
+                                dashPhase: dashPhase
+                            )
+                        )
+
+                    // CAPA 3: Borde exterior sutil para profundidad
+                    MapPolyline(routeInfo.polyline)
+                        .stroke(
+                            Color.blue.opacity(0.3),
+                            style: StrokeStyle(lineWidth: 11, lineCap: .round, lineJoin: .round)
+                        )
+                }
+
+                // Directional arrows along route
+                ForEach(Array(routeArrows.enumerated()), id: \.element.id) { index, arrow in
+                    Annotation("", coordinate: arrow.coordinate) {
+                        DirectionalArrowView(
+                            heading: arrow.heading,
+                            isNext: index == 0, // Primera flecha es la siguiente
+                            size: 40
+                        )
+                        .bounceIn()
+                    }
+                    .annotationTitles(.hidden)
+                }
+
                 // Temporary tap marker
-                if let coordinate = tappedCoordinate {
+                if let coordinate = tappedCoordinate, !routingMode {
                     Annotation("New Report", coordinate: coordinate) {
                         CustomMapPin(color: .red, icon: "plus.circle.fill")
                             .pulseEffect(color: .red, duration: 1.0)
@@ -247,7 +459,13 @@ struct EnhancedMapView: View {
     // MARK: - Helper Methods
 
     private func handleMapTap(at screenPoint: CGPoint, with proxy: MapProxy) {
-        if let coordinate = proxy.convert(screenPoint, from: .local) {
+        guard let coordinate = proxy.convert(screenPoint, from: .local) else { return }
+
+        if routingMode {
+            // Modo ruteo: establecer destino y calcular ruta
+            setDestination(at: coordinate)
+        } else {
+            // Modo normal: mostrar sheet de alertas
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 tappedCoordinate = coordinate
             }
@@ -280,6 +498,120 @@ struct EnhancedMapView: View {
         tappedCoordinate = locationManager.userLocation
         mostrarSheet = true
     }
+
+    // MARK: - Routing Methods
+
+    private func toggleRoutingMode() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            routingMode.toggle()
+        }
+
+        if !routingMode {
+            // Si se desactiva el modo ruteo, limpiar todo
+            clearRoute()
+        }
+    }
+
+    private func setDestination(at coordinate: CLLocationCoordinate2D, title: String = "Destination", subtitle: String? = nil) {
+        guard let origin = locationManager.userLocation else {
+            print("⚠️ No se puede calcular ruta sin ubicación del usuario")
+            return
+        }
+
+        // Establecer destino con nombre
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+            destination = DestinationPoint(
+                coordinate: coordinate,
+                title: title,
+                subtitle: subtitle
+            )
+        }
+
+        // Calcular ruta
+        routeManager.calculateRoute(from: origin, to: coordinate)
+
+        // Hacer zoom para mostrar toda la ruta después de calcularla
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            zoomToRoute()
+        }
+    }
+
+    private func clearRoute() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            destination = nil
+            routeManager.clearRoute()
+        }
+    }
+
+    private func zoomToRoute() {
+        guard let mapRect = routeManager.getRouteBounds() else { return }
+
+        // Convertir MKMapRect a región para la cámara
+        let region = MKCoordinateRegion(mapRect)
+
+        withAnimation(.easeInOut(duration: 1.2)) {
+            camera = .region(region)
+        }
+    }
+
+    // MARK: - Search Methods
+
+    private func handleSearchResultSelection(_ result: SearchResult) {
+        // Obtener coordenadas del resultado
+        searchManager.selectResult(result) { coordinate in
+            guard let coordinate = coordinate else {
+                print("⚠️ No se pudo obtener coordenadas del resultado")
+                return
+            }
+
+            // SIEMPRE establecer destino y calcular ruta
+            setDestination(
+                at: coordinate,
+                title: result.title,
+                subtitle: result.subtitle
+            )
+
+            // Mostrar toast de confirmación
+            showRouteToast(to: result.title)
+
+            // Haptic feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            // Limpiar búsqueda y cerrar teclado
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                searchManager.clearSearch()
+                isSearchFocused = false
+            }
+        }
+    }
+
+    private func centerCamera(on coordinate: CLLocationCoordinate2D, distance: Double = 1000) {
+        withAnimation(.easeInOut(duration: 1.0)) {
+            camera = .camera(
+                MapCamera(
+                    centerCoordinate: coordinate,
+                    distance: distance,
+                    heading: 0,
+                    pitch: 45
+                )
+            )
+        }
+    }
+
+    private func showRouteToast(to placeName: String) {
+        routeToastMessage = "Calculando ruta a \(placeName)"
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            showRouteToast = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                showRouteToast = false
+            }
+        }
+    }
+
 }
 
 // MARK: - Map Style Type
@@ -317,41 +649,8 @@ enum MapStyleType {
     }
 }
 
-// MARK: - Improved Search Bar
 
-struct ImprovedSearchBar: View {
-    @State private var searchText = ""
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 18))
-                    .foregroundColor(.gray)
-
-                TextField("Where to?", text: $searchText)
-                    .font(.system(size: 16))
-                    .foregroundColor(.primary)
-
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                    .transition(.scale)
-                }
-            }
-            .padding()
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 25))
-            .shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 5)
-            .padding(.horizontal)
-            .padding(.bottom, 10)
-        }
-    }
-}
-
-// MARK: - Floating Action Button
+// MARK: - Floating Action Button (Modernizado)
 
 struct FloatingActionButton: View {
     let icon: String
@@ -361,41 +660,133 @@ struct FloatingActionButton: View {
     let action: () -> Void
 
     @State private var isPressed = false
+    @State private var glowIntensity: Double = 0.3
 
     var body: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            // Haptic feedback
+            let impact = UIImpactFeedbackGenerator(style: isPrimary ? .medium : .light)
+            impact.impactOccurred()
+
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.65)) {
                 isPressed = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isPressed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.65)) {
+                    isPressed = false
+                }
             }
             action()
         }) {
-            Image(systemName: icon)
-                .font(.system(size: isPrimary ? 28 : 22, weight: .bold))
-                .foregroundColor(isPrimary ? .white : color)
-                .frame(width: size, height: size)
-                .background(
+            ZStack {
+                // Glow effect para botón primario
+                if isPrimary {
                     Circle()
                         .fill(
-                            isPrimary ?
-                            LinearGradient(
-                                colors: [color, color.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ) :
-                            LinearGradient(
-                                colors: [.white, .white],
-                                startPoint: .top,
-                                endPoint: .bottom
+                            RadialGradient(
+                                colors: [
+                                    color.opacity(glowIntensity),
+                                    color.opacity(glowIntensity * 0.5),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: size * 0.3,
+                                endRadius: size * 0.9
                             )
                         )
-                )
-                .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
+                        .frame(width: size * 1.3, height: size * 1.3)
+                        .blur(radius: 8)
+                }
+
+                // Fondo del botón
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Circle()
+                            .fill(
+                                isPrimary ?
+                                LinearGradient(
+                                    colors: [
+                                        color.opacity(0.95),
+                                        color.opacity(0.85)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ) :
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(0.9),
+                                        .white.opacity(0.85)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: isPrimary ?
+                                    [.white.opacity(0.6), .white.opacity(0.2)] :
+                                    [.black.opacity(0.1), .black.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: isPrimary ? 2 : 1.5
+                            )
+                    )
+                    .shadow(
+                        color: isPrimary ? color.opacity(0.4) : .black.opacity(0.15),
+                        radius: isPressed ? 8 : 12,
+                        x: 0,
+                        y: isPressed ? 3 : 6
+                    )
+                    .shadow(
+                        color: .black.opacity(0.1),
+                        radius: 3,
+                        x: 0,
+                        y: 2
+                    )
+
+                // Icono
+                Image(systemName: icon)
+                    .font(.system(size: isPrimary ? 28 : 22, weight: .semibold))
+                    .foregroundStyle(
+                        isPrimary ?
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.95)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ) :
+                        LinearGradient(
+                            colors: [color, color.opacity(0.9)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .shadow(
+                        color: isPrimary ? .black.opacity(0.3) : .clear,
+                        radius: 1,
+                        x: 0,
+                        y: 1
+                    )
+            }
         }
-        .scaleEffect(isPressed ? 0.9 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPressed)
+        .onAppear {
+            if isPrimary {
+                // Animación de glow pulsante
+                withAnimation(
+                    .easeInOut(duration: 1.8)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    glowIntensity = 0.5
+                }
+            }
+        }
     }
 }
 
@@ -452,38 +843,74 @@ struct AlertTypeButton: View {
 
     var body: some View {
         Button(action: {
+            // Haptic feedback mejorado
+            HapticAction.alertAdded.trigger()
+
             isPressed = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 isPressed = false
                 action()
             }
         }) {
             VStack(spacing: 8) {
                 ZStack {
+                    // Glow effect sutil
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    alertType.color.opacity(0.3),
+                                    alertType.color.opacity(0.15),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 25,
+                                endRadius: 35
+                            )
+                        )
+                        .frame(width: 70, height: 70)
+                        .blur(radius: 6)
+
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: alertType.gradientColors,
+                                colors: [
+                                    alertType.gradientColors[0],
+                                    alertType.gradientColors[1]
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 60, height: 60)
-                        .shadow(color: alertType.color.opacity(0.4), radius: 8, x: 0, y: 4)
+                        .frame(width: 62, height: 62)
+
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [.white.opacity(0.6), .white.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2.5
+                        )
+                        .frame(width: 62, height: 62)
 
                     Image(systemName: alertType.icon)
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.system(size: 28, weight: .semibold))
                         .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
+                .shadow(color: alertType.color.opacity(0.4), radius: 12, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
 
                 Text(alertType.rawValue)
-                    .font(.caption.bold())
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
             }
         }
-        .scaleEffect(isPressed ? 0.9 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .scaleEffect(isPressed ? 0.92 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.65), value: isPressed)
     }
 }
 
