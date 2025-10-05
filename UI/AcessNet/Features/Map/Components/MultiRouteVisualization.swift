@@ -249,15 +249,15 @@ struct RouteCardsSelector: View {
         let threshold: Double = 0.01
 
         // Asignar etiqueta especial solo a UNA ruta (la que tiene la característica más dominante)
-        // Prioridad: Speed > Air Quality > Safety
-        if index == fastestIndex && timeDifference >= threshold {
-            print("✅ Route \(index) is FASTEST")
-            return .fastest
-        } else if index == cleanestIndex && airDifference >= threshold && index != fastestIndex {
-            print("✅ Route \(index) is CLEANEST")
+        // Prioridad: Cleanest Air > Fastest > Safest
+        if index == cleanestIndex && airDifference >= threshold {
+            print("✅ Route \(index) is CLEANEST (Primera prioridad)")
             return .cleanest
-        } else if index == safestIndex && safetyDifference >= threshold && index != fastestIndex && index != cleanestIndex {
-            print("✅ Route \(index) is SAFEST")
+        } else if index == fastestIndex && timeDifference >= threshold && index != cleanestIndex {
+            print("✅ Route \(index) is FASTEST (Segunda prioridad)")
+            return .fastest
+        } else if index == safestIndex && safetyDifference >= threshold && index != cleanestIndex && index != fastestIndex {
+            print("✅ Route \(index) is SAFEST (Tercera prioridad)")
             return .safest
         }
 
