@@ -77,9 +77,11 @@ struct AtmosphericBlobShape: Shape {
 // MARK: - Animated Atmospheric Blob
 
 /// Vista de blob atmosférico con animación de "respiración"
+/// Optimizado para mejor rendimiento con opciones configurables
 struct AnimatedAtmosphericBlob: View {
     let zone: AirQualityZone
     let showParticles: Bool
+    let enableRotation: Bool
 
     @State private var breathingPhase: Double = 0
     @State private var rotationAngle: Double = 0
@@ -87,7 +89,7 @@ struct AnimatedAtmosphericBlob: View {
 
     var body: some View {
         ZStack {
-            // Capa 1: Glow exterior
+            // Capa 1: Glow exterior (blur optimizado: 12→6)
             AtmosphericBlobShape(irregularity: 0.2, phase: breathingPhase)
                 .fill(
                     RadialGradient(
@@ -102,10 +104,10 @@ struct AnimatedAtmosphericBlob: View {
                         endRadius: 60
                     )
                 )
-                .blur(radius: 12)
+                .blur(radius: 6)
                 .scaleEffect(1.3)
 
-            // Capa 2: Blob principal con gradiente mesh
+            // Capa 2: Blob principal con gradiente mesh (blur optimizado: 3→1.5)
             AtmosphericBlobShape(irregularity: 0.25, phase: breathingPhase)
                 .fill(
                     EllipticalGradient(
@@ -120,9 +122,9 @@ struct AnimatedAtmosphericBlob: View {
                         endRadiusFraction: 0.8
                     )
                 )
-                .blur(radius: 3)
+                .blur(radius: 1.5)
 
-            // Capa 3: Contorno con trazo irregular
+            // Capa 3: Contorno con trazo irregular (blur eliminado para performance)
             AtmosphericBlobShape(irregularity: 0.3, phase: breathingPhase)
                 .stroke(
                     zone.color.opacity(0.5),
@@ -134,7 +136,6 @@ struct AnimatedAtmosphericBlob: View {
                         dashPhase: breathingPhase * 10
                     )
                 )
-                .blur(radius: 0.5)
 
             // Capa 4: Partículas flotantes (solo para zonas contaminadas)
             if showParticles && shouldShowParticles {
@@ -163,12 +164,28 @@ struct AnimatedAtmosphericBlob: View {
             }
         }
         .frame(width: 80, height: 80)
-        .rotationEffect(.degrees(rotationAngle))
+        .rotationEffect(.degrees(enableRotation ? rotationAngle : 0))
         .onAppear {
             startBreathingAnimation()
-            startRotationAnimation()
+            if enableRotation {
+                startRotationAnimation()
+            }
             if showParticles && shouldShowParticles {
                 generateParticles()
+            }
+        }
+        .onChange(of: enableRotation) { _, newValue in
+            if newValue {
+                startRotationAnimation()
+            } else {
+                rotationAngle = 0
+            }
+        }
+        .onChange(of: showParticles) { _, newValue in
+            if newValue && shouldShowParticles {
+                generateParticles()
+            } else {
+                particles.removeAll()
             }
         }
     }
@@ -183,11 +200,12 @@ struct AnimatedAtmosphericBlob: View {
         zone.level == .unhealthy || zone.level == .severe || zone.level == .hazardous
     }
 
-    // MARK: - Animations
+    // MARK: - Animations (Optimizadas para rendimiento)
 
     private func startBreathingAnimation() {
+        // Duración aumentada: 4.0s → 8.0s (reduce frecuencia de re-render)
         withAnimation(
-            .easeInOut(duration: 4.0)
+            .easeInOut(duration: 8.0)
             .repeatForever(autoreverses: true)
         ) {
             breathingPhase = .pi * 2
@@ -195,8 +213,9 @@ struct AnimatedAtmosphericBlob: View {
     }
 
     private func startRotationAnimation() {
+        // Duración aumentada: 60.0s → 120.0s (rotación más sutil y eficiente)
         withAnimation(
-            .linear(duration: 60.0)
+            .linear(duration: 120.0)
             .repeatForever(autoreverses: false)
         ) {
             rotationAngle = 360
@@ -264,36 +283,45 @@ struct FloatingParticle: Identifiable {
 // MARK: - Enhanced Cloud Overlay (Reemplazo de MapCircle)
 
 /// Vista mejorada para overlay de zona en el mapa
+/// Conectada con AppSettings para control de performance
 struct EnhancedAirQualityOverlay: View {
     let zone: AirQualityZone
     let isVisible: Bool
     let index: Int
+    let settingsKey: String  // Clave única para forzar recreación cuando cambien settings
+
+    @EnvironmentObject var appSettings: AppSettings
 
     @State private var scale: CGFloat = 0.0
     @State private var opacity: Double = 0.0
 
     var body: some View {
-        AnimatedAtmosphericBlob(zone: zone, showParticles: true)
-            .scaleEffect(scale)
-            .opacity(opacity)
-            .onAppear {
-                // Stagger animation basado en index
-                let delay = Double(index) * 0.05
+        AnimatedAtmosphericBlob(
+            zone: zone,
+            showParticles: appSettings.enableAirQualityParticles,
+            enableRotation: appSettings.enableAirQualityRotation
+        )
+        .id(settingsKey) // Forzar recreación cuando cambien settings
+        .scaleEffect(scale)
+        .opacity(opacity)
+        .onAppear {
+            // Stagger animation basado en index
+            let delay = Double(index) * 0.05
 
-                withAnimation(
-                    .spring(response: 0.6, dampingFraction: 0.7)
-                    .delay(delay)
-                ) {
-                    scale = 1.0
-                    opacity = 1.0
-                }
+            withAnimation(
+                .spring(response: 0.6, dampingFraction: 0.7)
+                .delay(delay)
+            ) {
+                scale = 1.0
+                opacity = 1.0
             }
-            .onChange(of: isVisible) { _, newValue in
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    scale = newValue ? 1.0 : 0.0
-                    opacity = newValue ? 1.0 : 0.0
-                }
+        }
+        .onChange(of: isVisible) { _, newValue in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                scale = newValue ? 1.0 : 0.0
+                opacity = newValue ? 1.0 : 0.0
             }
+        }
     }
 }
 
@@ -317,7 +345,8 @@ struct EnhancedAirQualityOverlay: View {
                             pm25: 15
                         )
                     ),
-                    showParticles: true
+                    showParticles: false,
+                    enableRotation: true
                 )
 
                 // Poor
@@ -330,7 +359,8 @@ struct EnhancedAirQualityOverlay: View {
                             pm25: 55
                         )
                     ),
-                    showParticles: true
+                    showParticles: true,
+                    enableRotation: true
                 )
 
                 // Unhealthy
@@ -343,7 +373,8 @@ struct EnhancedAirQualityOverlay: View {
                             pm25: 85
                         )
                     ),
-                    showParticles: true
+                    showParticles: true,
+                    enableRotation: false
                 )
             }
         }

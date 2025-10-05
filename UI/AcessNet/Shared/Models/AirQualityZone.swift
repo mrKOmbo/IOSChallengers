@@ -118,9 +118,10 @@ struct AirQualityGridConfig {
 
     // MARK: - Presets
 
-    /// Configuración por defecto (7x7 grid, 500m radius, 800m spacing)
+    /// Configuración por defecto (5x5 grid, 500m radius, 800m spacing)
+    /// Optimizado para mejor rendimiento (25 zonas vs 49 zonas anterior)
     static let `default` = AirQualityGridConfig(
-        gridSize: 7,
+        gridSize: 5,
         zoneRadius: 500,
         spacing: 800,
         cacheTime: 120 // 2 minutos

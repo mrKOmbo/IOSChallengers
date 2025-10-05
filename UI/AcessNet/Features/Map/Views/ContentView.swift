@@ -99,6 +99,9 @@ struct EnhancedMapView: View {
     @State private var selectedZone: AirQualityZone?
     @State private var showZoneDetail: Bool = false
 
+    // MARK: - App Settings (Performance Controls)
+    @StateObject private var appSettings = AppSettings.shared
+
     // Enhanced tab bar height - usando constante global
     private let tabBarHeight: CGFloat = AppConstants.enhancedTabBarTotalHeight
 
@@ -554,12 +557,15 @@ struct EnhancedMapView: View {
                             .stroke(zone.strokeColor, lineWidth: 0.5)
 
                         // Atmospheric Blob mejorado (todas las zonas)
+                        // Key insight: Recrear vista cuando cambien settings de performance
                         Annotation("", coordinate: zone.coordinate) {
                             EnhancedAirQualityOverlay(
                                 zone: zone,
                                 isVisible: showAirQualityLayer,
-                                index: index
+                                index: index,
+                                settingsKey: "\(appSettings.enableAirQualityParticles)-\(appSettings.enableAirQualityRotation)"
                             )
+                            .environmentObject(appSettings)
                             .onTapGesture {
                                 handleZoneTap(zone)
                             }

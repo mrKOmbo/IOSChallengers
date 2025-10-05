@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var appSettings: AppSettings
 
     var body: some View {
         ZStack {
@@ -96,6 +97,65 @@ struct SettingsView: View {
                             subtitle: "They are calculated based on WHO Air...",
                             isOn: .constant(false)
                         )
+                    }
+
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.vertical, 24)
+
+                    // Performance Section
+                    VStack(alignment: .leading, spacing: 0) {
+                        SectionHeader(title: "PERFORMANCE")
+                            .padding(.bottom, 16)
+
+                        SettingsToggleRow(
+                            title: "Floating Particles",
+                            subtitle: "Animated particles on air quality zones. Disable to improve performance.",
+                            isOn: $appSettings.enableAirQualityParticles
+                        )
+
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.leading, 16)
+
+                        SettingsToggleRow(
+                            title: "Blob Rotation",
+                            subtitle: "Subtle rotation animation on air quality zones. Disable for smoother performance.",
+                            isOn: $appSettings.enableAirQualityRotation
+                        )
+
+                        // Performance Info Card
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.blue.opacity(0.8))
+
+                                Text("Performance Impact")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+
+                            Text("Grid: \(appSettings.totalAirQualityZones) zones • ~\(appSettings.estimatedActiveAnimations) animations")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.6))
+
+                            if appSettings.isHighPerformanceMode {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+
+                                    Text("Optimized for best performance")
+                                        .font(.caption2)
+                                        .foregroundColor(.green.opacity(0.9))
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.top, 12)
                     }
                 }
                 .padding(.horizontal)
