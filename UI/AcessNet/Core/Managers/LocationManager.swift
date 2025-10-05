@@ -174,3 +174,12 @@ extension LocationManager {
     }
 }
 
+// MARK: - Angle Conversion Extensions
+
+extension Double {
+    /// Converts degrees to radians
+    var degreesToRadians: Double { self * .pi / 180 }
+
+    /// Converts radians to degrees
+    var radiansToDegrees: Double { self * 180 / .pi }
+}
