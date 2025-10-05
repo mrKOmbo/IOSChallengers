@@ -10,27 +10,48 @@ import SwiftUI
 // MARK: - Route Segment Marker
 
 struct RouteSegmentMarker: View {
-    let isHighlighted: Bool
+    let segmentIndex: Int
+    let totalSegments: Int
+    @State private var animationPhase: CGFloat = 0
 
-    init(isHighlighted: Bool = false) {
-        self.isHighlighted = isHighlighted
+    init(segmentIndex: Int = 0, totalSegments: Int = 100) {
+        self.segmentIndex = segmentIndex
+        self.totalSegments = totalSegments
     }
 
     var body: some View {
         Circle()
             .fill(
-                LinearGradient(
-                    colors: isHighlighted ? [.cyan, .blue] : [.blue, .blue.opacity(0.9)],
-                    startPoint: .top,
-                    endPoint: .bottom
+                AngularGradient(
+                    gradient: Gradient(colors: [
+                        .cyan.opacity(0.8),
+                        .blue,
+                        .blue.opacity(0.6),
+                        .cyan.opacity(0.8)
+                    ]),
+                    center: .center,
+                    startAngle: .degrees(animationPhase),
+                    endAngle: .degrees(animationPhase + 360)
                 )
             )
-            .frame(width: isHighlighted ? 12 : 8, height: isHighlighted ? 12 : 8)
-            .shadow(color: .blue.opacity(0.6), radius: isHighlighted ? 6 : 4, x: 0, y: 2)
+            .frame(width: 8, height: 8)
+            .shadow(color: .blue.opacity(0.6), radius: 4, x: 0, y: 2)
             .overlay(
                 Circle()
-                    .strokeBorder(.white.opacity(0.8), lineWidth: isHighlighted ? 2 : 1)
+                    .strokeBorder(.white.opacity(0.9), lineWidth: 1.5)
             )
+            .onAppear {
+                // Delay basado en la posición en la ruta para efecto "wave"
+                let delay = Double(segmentIndex) * 0.02
+
+                withAnimation(
+                    .linear(duration: 2.0)
+                    .repeatForever(autoreverses: false)
+                    .delay(delay)
+                ) {
+                    animationPhase = 360
+                }
+            }
     }
 }
 
@@ -55,14 +76,14 @@ struct CompactRouteSegment: View {
 
         HStack(spacing: 40) {
             VStack {
-                RouteSegmentMarker(isHighlighted: false)
-                Text("Normal")
+                RouteSegmentMarker(segmentIndex: 0, totalSegments: 100)
+                Text("First Segment")
                     .font(.caption)
             }
 
             VStack {
-                RouteSegmentMarker(isHighlighted: true)
-                Text("Highlighted")
+                RouteSegmentMarker(segmentIndex: 50, totalSegments: 100)
+                Text("Mid Segment")
                     .font(.caption)
             }
 

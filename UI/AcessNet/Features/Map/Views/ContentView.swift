@@ -355,9 +355,12 @@ struct EnhancedMapView: View {
                 }
 
                 // Route segment points (elevated line) - Visible above buildings in 3D
-                ForEach(routeSegmentPoints) { point in
+                ForEach(Array(routeSegmentPoints.enumerated()), id: \.element.id) { index, point in
                     Annotation("", coordinate: point.coordinate) {
-                        RouteSegmentMarker()
+                        RouteSegmentMarker(
+                            segmentIndex: index,
+                            totalSegments: routeSegmentPoints.count
+                        )
                     }
                     .annotationTitles(.hidden)
                 }
