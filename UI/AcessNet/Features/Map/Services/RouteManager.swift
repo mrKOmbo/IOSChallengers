@@ -121,6 +121,10 @@ class RouteManager: ObservableObject {
         currentTask?.cancel()
         currentRoute = nil
         alternateRoutes = []
+        currentScoredRoute = nil
+        alternateScoredRoutes = []
+        allScoredRoutes = []
+        selectedRouteIndex = 0
         errorMessage = nil
         isCalculating = false
         lastDestination = nil
@@ -143,6 +147,11 @@ class RouteManager: ObservableObject {
     private func performRouteCalculation(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async {
         isCalculating = true
         errorMessage = nil
+
+        // Limpiar rutas anteriores inmediatamente para evitar líneas fantasma en el mapa
+        allScoredRoutes = []
+        currentScoredRoute = nil
+        alternateScoredRoutes = []
 
         // Crear placemarks
         let originPlacemark = MKPlacemark(coordinate: origin)
@@ -188,6 +197,7 @@ class RouteManager: ObservableObject {
                 alternateRoutes = []
                 currentScoredRoute = nil
                 alternateScoredRoutes = []
+                allScoredRoutes = []
             } else {
                 print("✅ Apple Maps retornó \(routes.count) rutas")
 
@@ -231,6 +241,7 @@ class RouteManager: ObservableObject {
             alternateRoutes = []
             currentScoredRoute = nil
             alternateScoredRoutes = []
+            allScoredRoutes = []
         }
 
         isCalculating = false

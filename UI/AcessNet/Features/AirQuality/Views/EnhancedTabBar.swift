@@ -17,7 +17,7 @@ enum TabTheme {
     var icon: String {
         switch self {
         case .home: return "house.fill"
-        case .map: return "location.fill"
+        case .map: return "map.fill"
         case .settings: return "gearshape.fill"
         }
     }

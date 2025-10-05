@@ -390,7 +390,7 @@ extension RoutePreference {
             return (0.3, 0.0, 0.7)  // 30% tiempo, 70% safety
 
         case .balancedSafety:
-            return (0.33, 0.33, 0.34)  // 33% cada uno
+            return (0.40, 0.10, 0.50)  // 50% safety, 40% time, 10% air - Prioriza seguridad + rapidez
 
         case .customWeighted(let timeWeight, let airWeight):
             // Añadir un peso de seguridad mínimo

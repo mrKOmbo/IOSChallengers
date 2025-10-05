@@ -13,6 +13,8 @@ import SwiftUI
 struct EnhancedAirQualityDashboard: View {
     @Binding var isExpanded: Bool
     let statistics: AirQualityGridManager.GridStatistics?
+    let referencePoint: AirQualityReferencePoint
+    let activeRoute: ScoredRoute?
 
     @State private var animateCharts: Bool = false
     @State private var glowIntensity: Double = 0.3
@@ -83,7 +85,7 @@ struct EnhancedAirQualityDashboard: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            // Animated AQI indicator
+            // Animated AQI indicator (más pequeño cuando hay ruta)
             ZStack {
                 // Glow effect
                 Circle()
@@ -95,11 +97,11 @@ struct EnhancedAirQualityDashboard: View {
                                 .clear
                             ],
                             center: .center,
-                            startRadius: 12,
-                            endRadius: 24
+                            startRadius: activeRoute != nil ? 10 : 12,
+                            endRadius: activeRoute != nil ? 20 : 24
                         )
                     )
-                    .frame(width: 48, height: 48)
+                    .frame(width: activeRoute != nil ? 40 : 48, height: activeRoute != nil ? 40 : 48)
                     .blur(radius: 6)
 
                 // Main circle
@@ -114,21 +116,62 @@ struct EnhancedAirQualityDashboard: View {
                             center: .center
                         )
                     )
-                    .frame(width: 40, height: 40)
+                    .frame(width: activeRoute != nil ? 34 : 40, height: activeRoute != nil ? 34 : 40)
 
                 // Icon
                 Image(systemName: "aqi.medium")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: activeRoute != nil ? 16 : 18, weight: .bold))
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Air Quality")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
+                HStack(spacing: 6) {
+                    Text(activeRoute != nil ? "Route Air Quality" : "Air Quality")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
 
-                if let stats = statistics {
+                    // Reference Point Indicator (solo cuando NO hay ruta)
+                    if activeRoute == nil {
+                        HStack(spacing: 3) {
+                            Image(systemName: referencePoint.icon)
+                                .font(.system(size: 8, weight: .semibold))
+                            Text(referencePoint.displayName)
+                                .font(.system(size: 9, weight: .medium))
+                        }
+                        .foregroundStyle(referencePoint.coordinate != nil ? Color.blue : Color.green)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill((referencePoint.coordinate != nil ? Color.blue : Color.green).opacity(0.15))
+                        )
+                    }
+                }
+
+                // Mostrar AQI de ruta o grid
+                if activeRoute != nil {
+                    // Mostrar AQI de la ruta
+                    HStack(spacing: 6) {
+                        Text("Avg AQI")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+
+                        Text("\(Int(displayAQI))")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundStyle(dominantColor)
+
+                        // Badge de nivel
+                        Text(displayLevel.rawValue)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(dominantColor)
+                            .clipShape(Capsule())
+                    }
+                } else if let stats = statistics {
+                    // Mostrar AQI del grid
                     HStack(spacing: 6) {
                         Text("AQI")
                             .font(.system(size: 12, weight: .medium))
@@ -153,28 +196,30 @@ struct EnhancedAirQualityDashboard: View {
             ZStack {
                 Circle()
                     .fill(dominantColor.opacity(0.1))
-                    .frame(width: 32, height: 32)
+                    .frame(width: activeRoute != nil ? 28 : 32, height: activeRoute != nil ? 28 : 32)
 
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: activeRoute != nil ? 11 : 12, weight: .bold))
                     .foregroundStyle(dominantColor)
             }
         }
-        .padding(16)
+        .padding(activeRoute != nil ? 12 : 16)
     }
 
     // MARK: - Expanded Content
 
     private var expandedContent: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: activeRoute != nil ? 12 : 20) {
             Divider()
                 .padding(.horizontal, 16)
 
             // Donut Chart + Stats
-            HStack(spacing: 24) {
-                // Donut chart
-                donutChartView
-                    .frame(width: 120, height: 120)
+            HStack(spacing: activeRoute != nil ? 16 : 24) {
+                // Donut chart (solo mostrar para grid, no para rutas)
+                if activeRoute == nil {
+                    donutChartView
+                        .frame(width: 120, height: 120)
+                }
 
                 // Stats breakdown
                 statsBreakdownView
@@ -188,17 +233,24 @@ struct EnhancedAirQualityDashboard: View {
             levelDistributionView
                 .padding(.horizontal, 16)
 
-            Divider()
-                .padding(.horizontal, 16)
+            // Solo mostrar Breathability y Quick Insights cuando NO hay ruta activa
+            if activeRoute == nil {
+                Divider()
+                    .padding(.horizontal, 16)
 
-            // Breathability Index integrado
-            breathabilitySection
-                .padding(.horizontal, 16)
+                // Breathability Index integrado
+                breathabilitySection
+                    .padding(.horizontal, 16)
 
-            // Quick insights
-            quickInsightsView
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
+                // Quick insights
+                quickInsightsView
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                // Padding bottom más pequeño para rutas
+                Color.clear
+                    .frame(height: 8)
+            }
         }
     }
 
@@ -241,35 +293,73 @@ struct EnhancedAirQualityDashboard: View {
     // MARK: - Stats Breakdown
 
     private var statsBreakdownView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let stats = statistics {
-                StatRow(
-                    icon: "leaf.fill",
-                    label: "Good",
-                    count: stats.goodCount,
-                    color: Color(hex: "#7BC043")
-                )
+        VStack(alignment: .leading, spacing: activeRoute != nil ? 8 : 12) {
+            Text("Air Quality Breakdown")
+                .font(.system(size: activeRoute != nil ? 12 : 13, weight: .semibold))
+                .foregroundStyle(.secondary)
 
-                StatRow(
-                    icon: "leaf",
-                    label: "Moderate",
-                    count: stats.moderateCount,
-                    color: Color(hex: "#F9A825")
-                )
+            if let route = activeRoute, let analysis = route.airQualityAnalysis {
+                // Mostrar distribución de segmentos de la ruta (compacto)
+                VStack(spacing: 6) {
+                    StatRow(
+                        icon: "checkmark.circle.fill",
+                        label: "Good",
+                        count: analysis.goodSegments,
+                        color: Color(hex: "#7BC043")
+                    )
 
-                StatRow(
-                    icon: "exclamationmark.triangle.fill",
-                    label: "Poor",
-                    count: stats.poorCount,
-                    color: Color(hex: "#FF6F00")
-                )
+                    StatRow(
+                        icon: "leaf",
+                        label: "Moderate",
+                        count: analysis.moderateSegments,
+                        color: Color(hex: "#F9A825")
+                    )
 
-                StatRow(
-                    icon: "xmark.shield.fill",
-                    label: "Unhealthy",
-                    count: stats.unhealthyCount + stats.severeCount + stats.hazardousCount,
-                    color: Color(hex: "#E53935")
-                )
+                    StatRow(
+                        icon: "exclamationmark.triangle.fill",
+                        label: "Poor",
+                        count: analysis.poorSegments,
+                        color: Color(hex: "#FF6F00")
+                    )
+
+                    StatRow(
+                        icon: "xmark.shield.fill",
+                        label: "Unhealthy",
+                        count: analysis.unhealthySegments + analysis.severeSegments + analysis.hazardousSegments,
+                        color: Color(hex: "#E53935")
+                    )
+                }
+            } else if let stats = statistics {
+                // Mostrar distribución del grid (código existente)
+                VStack(spacing: 8) {
+                    StatRow(
+                        icon: "leaf.fill",
+                        label: "Good",
+                        count: stats.goodCount,
+                        color: Color(hex: "#7BC043")
+                    )
+
+                    StatRow(
+                        icon: "leaf",
+                        label: "Moderate",
+                        count: stats.moderateCount,
+                        color: Color(hex: "#F9A825")
+                    )
+
+                    StatRow(
+                        icon: "exclamationmark.triangle.fill",
+                        label: "Poor",
+                        count: stats.poorCount,
+                        color: Color(hex: "#FF6F00")
+                    )
+
+                    StatRow(
+                        icon: "xmark.shield.fill",
+                        label: "Unhealthy",
+                        count: stats.unhealthyCount + stats.severeCount + stats.hazardousCount,
+                        color: Color(hex: "#E53935")
+                    )
+                }
             }
         }
     }
@@ -282,7 +372,20 @@ struct EnhancedAirQualityDashboard: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
 
-            if let stats = statistics {
+            if let route = activeRoute, let analysis = route.airQualityAnalysis {
+                // Barra de distribución para segmentos de ruta
+                DistributionBar(
+                    segments: [
+                        (analysis.goodSegments, Color(hex: "#7BC043")),
+                        (analysis.moderateSegments, Color(hex: "#F9A825")),
+                        (analysis.poorSegments, Color(hex: "#FF6F00")),
+                        (analysis.unhealthySegments + analysis.severeSegments + analysis.hazardousSegments, Color(hex: "#E53935"))
+                    ],
+                    total: analysis.totalSegments,
+                    animate: animateCharts
+                )
+            } else if let stats = statistics {
+                // Barra de distribución para grid (código existente)
                 DistributionBar(
                     segments: [
                         (stats.goodCount, Color(hex: "#7BC043")),
@@ -540,10 +643,25 @@ struct EnhancedAirQualityDashboard: View {
 
     // MARK: - Computed Properties
 
-    private var dominantColor: Color {
-        guard let stats = statistics else { return .gray }
+    /// AQI a mostrar: ruta si está activa, sino promedio del grid
+    private var displayAQI: Double {
+        if let route = activeRoute, let analysis = route.airQualityAnalysis {
+            return analysis.averageAQI
+        }
+        return statistics?.averageAQI ?? 0
+    }
 
-        let level = stats.dominantLevel
+    /// Nivel de AQI a mostrar
+    private var displayLevel: AQILevel {
+        if let route = activeRoute {
+            return route.averageAQILevel
+        }
+        return statistics?.dominantLevel ?? .good
+    }
+
+    private var dominantColor: Color {
+        // Usar displayLevel que considera tanto ruta como grid
+        let level = displayLevel
         switch level {
         case .good: return Color(hex: "#7BC043")
         case .moderate: return Color(hex: "#F9A825")
@@ -626,7 +744,9 @@ struct EnhancedAirQualityDashboard: View {
                     unhealthyCount: 3,
                     severeCount: 1,
                     hazardousCount: 0
-                )
+                ),
+                referencePoint: .userLocation,
+                activeRoute: nil
             )
             .frame(maxWidth: 320)
             .padding()

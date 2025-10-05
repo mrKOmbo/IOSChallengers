@@ -225,6 +225,50 @@ struct AirQualityRouteAnalysis: Codable, Identifiable {
     var summary: String {
         return "Avg AQI: \(Int(averageAQI)) (\(averageLevel.rawValue))"
     }
+
+    // MARK: - Route Level Distribution
+
+    /// Cuenta de segmentos por nivel de AQI
+    var goodSegments: Int {
+        segments.filter { AQILevel.from(aqi: Int($0.airQuality.aqi)) == .good }.count
+    }
+
+    var moderateSegments: Int {
+        segments.filter { AQILevel.from(aqi: Int($0.airQuality.aqi)) == .moderate }.count
+    }
+
+    var poorSegments: Int {
+        segments.filter { AQILevel.from(aqi: Int($0.airQuality.aqi)) == .poor }.count
+    }
+
+    var unhealthySegments: Int {
+        segments.filter { AQILevel.from(aqi: Int($0.airQuality.aqi)) == .unhealthy }.count
+    }
+
+    var severeSegments: Int {
+        segments.filter { AQILevel.from(aqi: Int($0.airQuality.aqi)) == .severe }.count
+    }
+
+    var hazardousSegments: Int {
+        segments.filter { AQILevel.from(aqi: Int($0.airQuality.aqi)) == .hazardous }.count
+    }
+
+    /// Total de segmentos analizados
+    var totalSegments: Int {
+        segments.count
+    }
+
+    /// Descripción detallada de la distribución
+    var levelDistributionSummary: String {
+        var parts: [String] = []
+        if goodSegments > 0 { parts.append("Good: \(goodSegments)") }
+        if moderateSegments > 0 { parts.append("Moderate: \(moderateSegments)") }
+        if poorSegments > 0 { parts.append("Poor: \(poorSegments)") }
+        if unhealthySegments > 0 { parts.append("Unhealthy: \(unhealthySegments)") }
+        if severeSegments > 0 { parts.append("Severe: \(severeSegments)") }
+        if hazardousSegments > 0 { parts.append("Hazardous: \(hazardousSegments)") }
+        return parts.joined(separator: ", ")
+    }
 }
 
 // MARK: - Coordinate Codable Wrapper

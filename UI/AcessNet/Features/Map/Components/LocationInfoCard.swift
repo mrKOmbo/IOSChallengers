@@ -13,9 +13,11 @@ import MapKit
 struct LocationInfoCard: View {
     let locationInfo: LocationInfo
     let onCalculateRoute: () -> Void
+    let onViewAirQuality: () -> Void
     let onCancel: () -> Void
 
     @State private var isPressed = false
+    @State private var isAirQualityPressed = false
     @State private var showContent = false
     private var sanitizedSubtitle: String? {
         guard let subtitle = locationInfo.subtitle?
@@ -72,8 +74,8 @@ struct LocationInfoCard: View {
             Divider()
                 .opacity(showContent ? 1 : 0)
 
-            // SECCIÓN 4: Botón de Acción
-            actionButton
+            // SECCIÓN 4: Botones de Acción
+            actionButtons
                 .opacity(showContent ? 1 : 0)
                 .scaleEffect(showContent ? 1.0 : 0.9)
         }
@@ -304,47 +306,99 @@ struct LocationInfoCard: View {
         )
     }
 
-    private var actionButton: some View {
-        Button(action: {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            // Botón primario: Calcular Ruta
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
 
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                isPressed = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                    isPressed = false
+                    isPressed = true
                 }
-            }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                        isPressed = false
+                    }
+                }
 
-            onCalculateRoute()
-        }) {
-            HStack(spacing: 10) {
-                Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                onCalculateRoute()
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                        .font(.system(size: 18, weight: .semibold))
 
-                Text("Calcular Ruta")
-                    .font(.subheadline.weight(.bold))
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.blue,
-                        Color.blue.opacity(0.85)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    Text("Calcular Ruta")
+                        .font(.subheadline.weight(.bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.blue,
+                            Color.blue.opacity(0.85)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .coloredShadow(color: .blue, intensity: 0.4, radius: 12, y: 6)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .coloredShadow(color: .blue, intensity: 0.4, radius: 12, y: 6)
+            }
+            .scaleEffect(isPressed ? 0.96 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
+
+            // Botón secundario: Ver Calidad del Aire
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                    isAirQualityPressed = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                        isAirQualityPressed = false
+                    }
+                }
+
+                onViewAirQuality()
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "aqi.medium")
+                        .font(.system(size: 18, weight: .semibold))
+
+                    Text("Ver Calidad del Aire")
+                        .font(.subheadline.weight(.bold))
+                }
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.teal, Color.teal.opacity(0.85)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.teal, Color.teal.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 2
+                        )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .scaleEffect(isAirQualityPressed ? 0.96 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isAirQualityPressed)
         }
-        .scaleEffect(isPressed ? 0.96 : 1.0)
-        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isPressed)
     }
 
     // MARK: - Color Helpers
@@ -447,6 +501,7 @@ struct PollutantMetric: View {
                 )
             ),
             onCalculateRoute: { print("Calculate route") },
+            onViewAirQuality: { print("View air quality") },
             onCancel: { print("Cancel") }
         )
         .padding()
@@ -474,6 +529,7 @@ struct PollutantMetric: View {
                 )
             ),
             onCalculateRoute: { print("Calculate route") },
+            onViewAirQuality: { print("View air quality") },
             onCancel: { print("Cancel") }
         )
         .padding()
@@ -501,6 +557,7 @@ struct PollutantMetric: View {
                 )
             ),
             onCalculateRoute: { print("Calculate route") },
+            onViewAirQuality: { print("View air quality") },
             onCancel: { print("Cancel") }
         )
         .padding()

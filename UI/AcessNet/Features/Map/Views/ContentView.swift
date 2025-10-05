@@ -54,6 +54,41 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Air Quality Reference Point
+
+/// Punto de referencia para el grid de calidad del aire
+enum AirQualityReferencePoint {
+    case userLocation
+    case destination(CLLocationCoordinate2D)
+
+    var coordinate: CLLocationCoordinate2D? {
+        switch self {
+        case .userLocation:
+            return nil
+        case .destination(let coord):
+            return coord
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .userLocation:
+            return "Your Location"
+        case .destination:
+            return "Destination (Point B)"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .userLocation:
+            return "location.fill"
+        case .destination:
+            return "mappin.circle.fill"
+        }
+    }
+}
+
 // MARK: - Enhanced Map View
 
 struct EnhancedMapView: View {
@@ -98,6 +133,7 @@ struct EnhancedMapView: View {
     @State private var showAirQualityLegend: Bool = false
     @State private var selectedZone: AirQualityZone?
     @State private var showZoneDetail: Bool = false
+    @State private var airQualityReferencePoint: AirQualityReferencePoint = .userLocation
 
     // MARK: - App Settings (Performance Controls)
     @StateObject private var appSettings = AppSettings.shared
@@ -113,11 +149,19 @@ struct EnhancedMapView: View {
     // MARK: - Proximity Filtering (2km Radius)
 
     /// Zonas de calidad del aire dentro del rango de visibilidad (2km)
+    /// NOTA: Cuando hay rutas activas, deshabilita el filtro para mostrar TODAS las zonas de las rutas
     private var visibleAirQualityZones: [AirQualityZone] {
         guard let userLocation = locationManager.userLocation else {
             return airQualityGridManager.zones
         }
 
+        // Si hay rutas activas, deshabilitar filtro para mostrar TODAS las zonas de las rutas
+        if hasActiveRoute {
+            print("🛣️ Proximity Filtering DISABLED (active route) - Showing all \(airQualityGridManager.zones.count) zones")
+            return airQualityGridManager.zones
+        }
+
+        // Filtro normal cuando NO hay rutas
         guard appSettings.enableProximityFiltering else {
             print("📍 Proximity Filtering DISABLED - Showing all \(airQualityGridManager.zones.count) zones")
             return airQualityGridManager.zones
@@ -240,51 +284,57 @@ struct EnhancedMapView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // Speed Indicator (top left)
-            VStack {
-                HStack {
-                    if locationManager.isMoving && !isSearchFocused {
-                        CompactSpeedIndicator(speed: locationManager.speedKmh)
-                            .padding(.leading)
-                            .fadeIn(delay: 0.2)
+            // Speed Indicator (top left) - ocultar cuando hay ruta activa
+            if !hasActiveRoute {
+                VStack {
+                    HStack {
+                        if locationManager.isMoving && !isSearchFocused {
+                            CompactSpeedIndicator(speed: locationManager.speedKmh)
+                                .padding(.leading)
+                                .fadeIn(delay: 0.2)
+                        }
+                        Spacer()
                     }
                     Spacer()
                 }
-                Spacer()
+                .padding(.top, 60)
+                .transition(.opacity)
             }
-            .padding(.top, 60)
 
-            // Controles superiores: barra de búsqueda
-            VStack(alignment: .leading, spacing: 0) {
-                SearchBarView(
-                    searchText: $searchManager.searchQuery,
-                    isFocused: $isSearchFocused,
-                    placeholder: "Where to?",
-                    onSubmit: {
-                        // Opcional: submit search
-                    },
-                    onClear: {
-                        searchManager.clearSearch()
-                    }
-                )
-                .layoutPriority(1)
-                .fadeIn(delay: 0.1)
-                .padding(.horizontal)
-                .padding(.top, AppConstants.safeAreaTop + 12)
-
-                if !searchManager.searchResults.isEmpty || searchManager.isSearching {
-                    SearchResultsView(
-                        results: searchManager.searchResults,
-                        isSearching: searchManager.isSearching,
-                        userLocation: locationManager.userLocation,
-                        onSelect: handleSearchResultSelection
+            // Controles superiores: barra de búsqueda (ocultar cuando hay ruta activa)
+            if !hasActiveRoute {
+                VStack(alignment: .leading, spacing: 0) {
+                    SearchBarView(
+                        searchText: $searchManager.searchQuery,
+                        isFocused: $isSearchFocused,
+                        placeholder: "Where to?",
+                        onSubmit: {
+                            // Opcional: submit search
+                        },
+                        onClear: {
+                            searchManager.clearSearch()
+                        }
                     )
+                    .layoutPriority(1)
+                    .fadeIn(delay: 0.1)
                     .padding(.horizontal)
-                    .padding(.top, -10)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
+                    .padding(.top, AppConstants.safeAreaTop + 12)
 
-                Spacer()
+                    if !searchManager.searchResults.isEmpty || searchManager.isSearching {
+                        SearchResultsView(
+                            results: searchManager.searchResults,
+                            isSearching: searchManager.isSearching,
+                            userLocation: locationManager.userLocation,
+                            onSelect: handleSearchResultSelection
+                        )
+                        .padding(.horizontal)
+                        .padding(.top, -10)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             // Route Preference Selector (sheet modal)
@@ -299,6 +349,9 @@ struct EnhancedMapView: View {
                         // Recalcular rutas con nuevas preferencias
                         if let destination = destination {
                             guard let userLocation = locationManager.userLocation else { return }
+
+                            // Limpiar rutas anteriores ANTES de recalcular
+                            routeManager.clearRoute()
 
                             // Actualizar zonas de calidad del aire en RouteManager
                             routeManager.updateAirQualityZones(airQualityGridManager.zones)
@@ -328,6 +381,9 @@ struct EnhancedMapView: View {
                                 showLocationInfo = false
                             }
 
+                            // Limpiar rutas anteriores ANTES de calcular nuevas
+                            routeManager.clearRoute()
+
                             // Actualizar datos en el RouteManager
                             routeManager.updateActiveIncidents(annotations)
                             routeManager.updateAirQualityZones(airQualityGridManager.zones)
@@ -345,6 +401,22 @@ struct EnhancedMapView: View {
 
                             // Mostrar toast
                             showRouteToast(to: locationInfo.title)
+                        },
+                        onViewAirQuality: {
+                            // Activar capa de calidad del aire centrada en el destino
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                showAirQualityLayer = true
+                                showLocationInfo = false  // Cerrar card para mejor visualización
+                            }
+
+                            // Centrar cámara en el destino con zoom apropiado para ver grid de calidad del aire
+                            // Grid 3x3 con 800m spacing = ~2.4km diámetro, usar 3500m para ver todo
+                            centerCamera(on: locationInfo.coordinate, distance: 3500)
+
+                            print("🌫️ Capa de calidad del aire activada y centrada en destino")
                         },
                         onCancel: {
                             // Limpiar destino y ocultar card
@@ -391,7 +463,23 @@ struct EnhancedMapView: View {
                                 scoredRoute: routeManager.currentScoredRoute,
                                 isCalculating: routeManager.isCalculating,
                                 onClear: clearRoute,
-                                onStartNavigation: nil // Opcional: implementar navegación
+                                onStartNavigation: nil, // Opcional: implementar navegación
+                                onViewAirQuality: {
+                                    // Activar capa de calidad del aire centrada en la ruta
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        showAirQualityLayer = true
+                                    }
+
+                                    // Hacer zoom para mostrar toda la ruta con el grid de calidad del aire
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        zoomToRoute()
+                                    }
+
+                                    print("🌫️ Capa de calidad del aire activada y zoom a ruta")
+                                }
                             )
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                         } else if let errorMessage = routeManager.errorMessage {
@@ -415,7 +503,9 @@ struct EnhancedMapView: View {
                         // Enhanced Dashboard con gráficos y breathability integrado
                         EnhancedAirQualityDashboard(
                             isExpanded: $showAirQualityLegend,
-                            statistics: airQualityGridManager.getStatistics()
+                            statistics: airQualityGridManager.getStatistics(),
+                            referencePoint: airQualityReferencePoint,
+                            activeRoute: routeManager.currentScoredRoute
                         )
                         .frame(maxWidth: 320)
                         .padding(.trailing)
@@ -487,7 +577,47 @@ struct EnhancedMapView: View {
 
                 // Actualizar grid de calidad del aire si está activo
                 if showAirQualityLayer {
-                    airQualityGridManager.updateGrid(center: location)
+                    // Determinar centro del grid según punto de referencia
+                    let gridCenter: CLLocationCoordinate2D
+
+                    switch airQualityReferencePoint {
+                    case .userLocation:
+                        // Centrar en ubicación del usuario
+                        gridCenter = location
+                    case .destination(let destinationCoord):
+                        // Centrar en el destino (Punto B)
+                        gridCenter = destinationCoord
+                        print("📍 Grid centrado en Punto B: (\(String(format: "%.4f", destinationCoord.latitude)), \(String(format: "%.4f", destinationCoord.longitude)))")
+                    }
+
+                    airQualityGridManager.updateGrid(center: gridCenter)
+                }
+            }
+        }
+        .onChange(of: destination) { oldDestination, newDestination in
+            // Actualizar punto de referencia del grid cuando cambie el destino
+            if let dest = newDestination {
+                // Usuario estableció un destino → cambiar a Punto B
+                airQualityReferencePoint = .destination(dest.coordinate)
+
+                // Limpiar búsqueda automáticamente
+                searchManager.clearSearch()
+                isSearchFocused = false
+
+                print("🎯 Punto de referencia cambiado a: Destino (Punto B)")
+
+                // Solo actualizar grid si NO hay ruta activa (las rutas usan su propio grid)
+                if showAirQualityLayer && !hasActiveRoute {
+                    airQualityGridManager.updateGrid(center: dest.coordinate)
+                }
+            } else {
+                // Usuario eliminó el destino → volver a ubicación del usuario
+                airQualityReferencePoint = .userLocation
+                print("📍 Punto de referencia cambiado a: Tu Ubicación")
+
+                // Actualizar grid inmediatamente si la capa está activa
+                if showAirQualityLayer, let userLocation = locationManager.userLocation {
+                    airQualityGridManager.updateGrid(center: userLocation)
                 }
             }
         }
@@ -509,6 +639,18 @@ struct EnhancedMapView: View {
                 routeArrows = []
                 dashPhase = 0
             }
+        }
+        .onReceive(routeManager.$allScoredRoutes) { routes in
+            // Cuando se calculan rutas nuevas, generar círculos grandes que cubran el área de TODAS las rutas
+            guard !routes.isEmpty, showAirQualityLayer else { return }
+
+            // Obtener todos los polylines de todas las rutas
+            let allPolylines = routes.map { $0.routeInfo.route.polyline }
+
+            // Generar círculos de calidad del aire SOLO a lo largo de las rutas con espaciado dinámico
+            airQualityGridManager.updateZonesAlongRoutes(polylines: allPolylines)
+
+            print("🗺️ Rutas calculadas: generando círculos de calidad del aire a lo largo de \(routes.count) rutas")
         }
     }
 
@@ -876,12 +1018,19 @@ struct EnhancedMapView: View {
             )
         }
 
+        // Limpiar búsqueda automáticamente
+        searchManager.clearSearch()
+        isSearchFocused = false
+
         // Solo calcular ruta si se solicita
         if calculateRoute {
             guard let origin = locationManager.userLocation else {
                 print("⚠️ No se puede calcular ruta sin ubicación del usuario")
                 return
             }
+
+            // Limpiar rutas anteriores ANTES de calcular nuevas
+            routeManager.clearRoute()
 
             // Actualizar datos en el RouteManager
             routeManager.updateActiveIncidents(annotations)
@@ -905,6 +1054,12 @@ struct EnhancedMapView: View {
             destination = nil
             routeManager.clearRoute()
             selectedRouteIndex = nil
+
+            // Volver a grid centrado en ubicación del usuario
+            if showAirQualityLayer, let userLocation = locationManager.userLocation {
+                airQualityGridManager.updateGrid(center: userLocation)
+                print("🔄 Restaurando grid de calidad del aire centrado en ubicación del usuario")
+            }
         }
     }
 
@@ -930,12 +1085,12 @@ struct EnhancedMapView: View {
     private func zoomToRoute() {
         guard let mapRect = routeManager.getRouteBounds() else { return }
 
-        // Convertir MKMapRect a región para la cámara con padding extra para ver toda la ruta
+        // Convertir MKMapRect a región para la cámara con mayor espacio visual
         var region = MKCoordinateRegion(mapRect)
 
-        // Expandir región 50% para dar espacio visual
-        region.span.latitudeDelta *= 1.5
-        region.span.longitudeDelta *= 1.5
+        // Expandir región 100% para ver toda la ruta con más contexto (más alejado)
+        region.span.latitudeDelta *= 2.0
+        region.span.longitudeDelta *= 2.0
 
         withAnimation(.easeInOut(duration: 1.5)) {
             camera = .region(region)

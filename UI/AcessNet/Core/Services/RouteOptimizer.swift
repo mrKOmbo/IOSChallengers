@@ -164,10 +164,30 @@ class RouteOptimizer: ObservableObject {
         // Ordenar por score combinado
         optimizedRoutes.sort { $0.combinedScore > $1.combinedScore }
 
+        // Asignar rankPositions después de ordenar (1 = mejor ruta)
+        let fastestTime = optimizedRoutes.first?.routeInfo.expectedTravelTime ?? 600
+        let cleanestAQI = optimizedRoutes.compactMap { $0.airQualityAnalysis?.averageAQI }.min() ?? 50
+
+        var rankedRoutes: [ScoredRoute] = []
+        for (index, route) in optimizedRoutes.enumerated() {
+            let rankedRoute = ScoredRoute(
+                id: route.id,
+                routeInfo: route.routeInfo,
+                airQualityAnalysis: route.airQualityAnalysis,
+                incidentAnalysis: route.incidentAnalysis,
+                fastestTime: fastestTime,
+                cleanestAQI: cleanestAQI,
+                safestSafetyScore: route.safetyScore,
+                preference: route.preference,
+                rankPosition: index + 1  // 1 = mejor, 2 = segunda, etc.
+            )
+            rankedRoutes.append(rankedRoute)
+        }
+
         isOptimizing = false
         optimizationProgress = 1.0
 
-        return Array(optimizedRoutes.prefix(config.maxAlternatives))
+        return Array(rankedRoutes.prefix(config.maxAlternatives))
     }
 
     /// Calcula zonas de evitación basadas en incidentes y calidad del aire
@@ -366,11 +386,12 @@ class RouteOptimizer: ObservableObject {
 
         var aqiValues: [Double] = []
         var pm25Values: [Double] = []
-        var foundZones: [AirQualityZone] = []
+        var segments: [AirQualitySegment] = []
 
-        // Samplear cada 200m
-        let sampleInterval = 200.0
+        // MEJORADO: Samplear cada 100m para más detalle (era 200m)
+        let sampleInterval = 100.0
         var accumulatedDistance = 0.0
+        var lastCoord: CLLocationCoordinate2D? = coordinates.first
 
         for i in 0..<coordinates.count - 1 {
             let coord1 = coordinates[i]
@@ -382,7 +403,16 @@ class RouteOptimizer: ObservableObject {
                 if let nearestZone = findNearestAirQualityZone(to: coord1) {
                     aqiValues.append(nearestZone.airQuality.aqi)
                     pm25Values.append(nearestZone.airQuality.pm25)
-                    foundZones.append(nearestZone)
+
+                    // Crear segmento con coordenadas reales
+                    let segment = AirQualitySegment(
+                        startCoordinate: lastCoord ?? coord1,
+                        endCoordinate: coord1,
+                        distanceMeters: sampleInterval,
+                        airQuality: nearestZone.airQuality
+                    )
+                    segments.append(segment)
+                    lastCoord = coord1
                 }
                 accumulatedDistance = 0
             }
@@ -390,46 +420,25 @@ class RouteOptimizer: ObservableObject {
             accumulatedDistance += segmentDistance
         }
 
-        guard !aqiValues.isEmpty else { return nil }
+        // Capturar último segmento si quedó pendiente (mínimo 50m)
+        if accumulatedDistance > 50, let lastC = lastCoord, let finalCoord = coordinates.last {
+            if let nearestZone = findNearestAirQualityZone(to: finalCoord) {
+                aqiValues.append(nearestZone.airQuality.aqi)
+                pm25Values.append(nearestZone.airQuality.pm25)
 
-        let avgAQI = aqiValues.reduce(0, +) / Double(aqiValues.count)
-        let avgPM25 = pm25Values.reduce(0, +) / Double(pm25Values.count)
-        let maxAQI = aqiValues.max() ?? avgAQI
-        let minAQI = aqiValues.min() ?? avgAQI
-
-        // Crear segmentos de análisis para la ruta
-        var segments: [AirQualitySegment] = []
-
-        // Crear segmentos basados en las zonas encontradas
-        for (index, zone) in foundZones.enumerated() {
-            let segment = AirQualitySegment(
-                startCoordinate: zone.coordinate,
-                endCoordinate: zone.coordinate, // Simplificado por ahora
-                distanceMeters: zone.radius,
-                airQuality: zone.airQuality
-            )
-            segments.append(segment)
+                let segment = AirQualitySegment(
+                    startCoordinate: lastC,
+                    endCoordinate: finalCoord,
+                    distanceMeters: accumulatedDistance,
+                    airQuality: nearestZone.airQuality
+                )
+                segments.append(segment)
+            }
         }
 
-        // Si no hay segmentos, crear uno con valores promedio
-        if segments.isEmpty {
-            let avgPoint = AirQualityPoint(
-                coordinate: route.route.polyline.coordinates().first ?? CLLocationCoordinate2D(),
-                aqi: avgAQI,
-                pm25: avgPM25,
-                pm10: 0
-            )
+        guard !segments.isEmpty else { return nil }
 
-            let segment = AirQualitySegment(
-                startCoordinate: route.route.polyline.coordinates().first ?? CLLocationCoordinate2D(),
-                endCoordinate: route.route.polyline.coordinates().last ?? CLLocationCoordinate2D(),
-                distanceMeters: route.route.distance,
-                airQuality: avgPoint
-            )
-            segments.append(segment)
-        }
-
-        // Crear análisis con los segmentos
+        // Crear análisis con los segmentos ya creados en el loop
         return AirQualityRouteAnalysis(
             segments: segments
         )

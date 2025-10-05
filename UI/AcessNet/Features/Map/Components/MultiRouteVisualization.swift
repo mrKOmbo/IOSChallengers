@@ -68,24 +68,24 @@ struct RoutePolylineMapContent: MapContent {
         // Capa base (sombra)
         MapPolyline(route.routeInfo.route.polyline)
             .stroke(
-                Color.black.opacity(0.3),
+                Color.black.opacity(isSelected ? 0.4 : 0.2),
                 style: StrokeStyle(
-                    lineWidth: isSelected ? 8 : 6,
+                    lineWidth: isSelected ? 10 : 6,
                     lineCap: .round,
                     lineJoin: .round
                 )
             )
 
-        // Capa principal con gradiente
+        // Capa principal con gradiente (color más intenso si está seleccionada)
         MapPolyline(route.routeInfo.route.polyline)
             .stroke(
                 LinearGradient(
-                    colors: routeStyle.gradientColors,
+                    colors: isSelected ? selectedGradientColors : routeStyle.gradientColors,
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
                 style: StrokeStyle(
-                    lineWidth: isSelected ? 6 : 4,
+                    lineWidth: isSelected ? 7 : 4,
                     lineCap: .round,
                     lineJoin: .round
                 )
@@ -97,14 +97,14 @@ struct RoutePolylineMapContent: MapContent {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            routeStyle.pulseColor.opacity(0.6),
-                            routeStyle.pulseColor.opacity(0.3)
+                            Color.white.opacity(0.7),
+                            Color.white.opacity(0.4)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
                     style: StrokeStyle(
-                        lineWidth: 7,
+                        lineWidth: 4,
                         lineCap: .round,
                         lineJoin: .round,
                         dash: [20, 15],
@@ -112,6 +112,11 @@ struct RoutePolylineMapContent: MapContent {
                     )
                 )
         }
+    }
+
+    // Colores más intensos para la ruta seleccionada
+    private var selectedGradientColors: [Color] {
+        [Color(hex: "#00B020"), Color(hex: "#00D428")]  // Verde intenso y brillante
     }
 }
 
@@ -129,28 +134,28 @@ enum RouteStyle {
     var gradientColors: [Color] {
         switch self {
         case .primary:
-            return [Color.blue, Color.blue.opacity(0.7)]
+            return [Color(hex: "#34C759"), Color(hex: "#30D158")]  // Verde medio brillante
         case .fastest:
-            return [Color.purple, Color.indigo]
+            return [Color(hex: "#52C41A"), Color(hex: "#73D13D")]  // Verde lima
         case .safest:
-            return [Color.green, Color.mint]
+            return [Color(hex: "#2ECC71"), Color(hex: "#27AE60")]  // Verde esmeralda
         case .cleanest:
-            return [Color.teal, Color.cyan]
+            return [Color(hex: "#00C853"), Color(hex: "#64DD17")]  // Verde claro brillante
         case .alternative1:
-            return [Color.orange, Color.yellow]
+            return [Color(hex: "#7CB342"), Color(hex: "#9CCC65")]  // Verde oliva claro
         case .alternative2:
-            return [Color.gray, Color.gray.opacity(0.6)]
+            return [Color(hex: "#66BB6A"), Color(hex: "#81C784")]  // Verde pastel
         }
     }
 
     var pulseColor: Color {
         switch self {
-        case .primary: return .blue
-        case .fastest: return .purple
-        case .safest: return .green
-        case .cleanest: return .teal
-        case .alternative1: return .orange
-        case .alternative2: return .gray
+        case .primary: return Color(hex: "#34C759")
+        case .fastest: return Color(hex: "#52C41A")
+        case .safest: return Color(hex: "#2ECC71")
+        case .cleanest: return Color(hex: "#00C853")
+        case .alternative1: return Color(hex: "#7CB342")
+        case .alternative2: return Color(hex: "#66BB6A")
         }
     }
 
@@ -197,6 +202,7 @@ struct RouteCardsSelector: View {
                         isSelected: selectedIndex == index,
                         isExpanded: expandedCard == route.id,
                         routeStyle: determineStyle(for: route, at: index),
+                        bestRouteTime: routes.first?.routeInfo.expectedTravelTime,
                         onTap: {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                 selectedIndex = index
@@ -217,17 +223,38 @@ struct RouteCardsSelector: View {
     }
 
     private func determineStyle(for route: ScoredRoute, at index: Int) -> RouteStyle {
-        if route.combinedScore >= 90 {
-            return .primary
-        } else if route.timeScore >= 90 {
-            return .fastest
-        } else if route.safetyScore >= 90 {
+        // Protección: si solo hay una ruta, es Recommended
+        guard routes.count > 1 else { return .primary }
+
+        // Determinar qué ruta tiene cada característica más alta
+        let safestIndex = routes.enumerated().max(by: { $0.element.safetyScore < $1.element.safetyScore })?.offset
+        let fastestIndex = routes.enumerated().max(by: { $0.element.timeScore < $1.element.timeScore })?.offset
+        let cleanestIndex = routes.enumerated().max(by: { $0.element.airQualityScore < $1.element.airQualityScore })?.offset
+
+        // Calcular diferencias entre mejor y peor ruta
+        let safetyScores = routes.map { $0.safetyScore }
+        let timeScores = routes.map { $0.timeScore }
+        let airScores = routes.map { $0.airQualityScore }
+
+        let safetyDifference = (safetyScores.max() ?? 0) - (safetyScores.min() ?? 0)
+        let timeDifference = (timeScores.max() ?? 0) - (timeScores.min() ?? 0)
+        let airDifference = (airScores.max() ?? 0) - (airScores.min() ?? 0)
+
+        // Umbral reducido a 2 puntos para ser más sensible
+        let threshold: Double = 2.0
+
+        // Asignar etiqueta especial solo a UNA ruta (la que tiene la característica más dominante)
+        // Prioridad: Safety > Speed > Air Quality
+        if index == safestIndex && safetyDifference >= threshold {
             return .safest
-        } else if route.airQualityScore >= 85 {
+        } else if index == fastestIndex && timeDifference >= threshold && index != safestIndex {
+            return .fastest
+        } else if index == cleanestIndex && airDifference >= threshold && index != safestIndex && index != fastestIndex {
             return .cleanest
-        } else {
-            return index == 1 ? .alternative1 : .alternative2
         }
+
+        // Todas las demás rutas simplemente son "Recommended"
+        return .primary
     }
 }
 
@@ -240,6 +267,7 @@ struct RouteComparisonCard: View {
     let isSelected: Bool
     let isExpanded: Bool
     let routeStyle: RouteStyle
+    let bestRouteTime: TimeInterval?
     let onTap: () -> Void
     let onExpand: () -> Void
 
@@ -274,6 +302,20 @@ struct RouteComparisonCard: View {
                         Text("Best overall")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                    } else if let bestTime = bestRouteTime {
+                        // Mostrar diferencia con la mejor ruta
+                        let timeDiff = route.routeInfo.expectedTravelTime - bestTime
+                        let timeDiffMin = Int(timeDiff / 60)
+
+                        if timeDiffMin > 0 {
+                            Text("+\(timeDiffMin) min")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        } else {
+                            Text("Similar time")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

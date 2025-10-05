@@ -16,6 +16,7 @@ struct RouteInfoCard: View {
     let isCalculating: Bool
     let onClear: () -> Void
     let onStartNavigation: (() -> Void)?
+    let onViewAirQuality: (() -> Void)?
 
     @State private var isExpanded = false
     @State private var showAlternates = false
@@ -188,6 +189,30 @@ struct RouteInfoCard: View {
                     }
                 }
 
+
+                // Botón Ver Calidad del Aire (opcional)
+                if let viewAirQuality = onViewAirQuality {
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        viewAirQuality()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "aqi.medium")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Air Quality")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.teal)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(.teal.opacity(0.12))
+                        )
+                    }
+                }
                 // Botón Clear Route
                 Button(action: {
                     let impact = UIImpactFeedbackGenerator(style: .light)
@@ -695,7 +720,8 @@ struct EnhancedRouteInfoCard: View {
             scoredRoute: nil,  // Sin datos avanzados en el preview
             isCalculating: false,
             onClear: { print("Clear tapped") },
-            onStartNavigation: { print("Start navigation") }
+            onStartNavigation: { print("Start navigation") },
+            onViewAirQuality: { print("View air quality") }
         )
         .padding()
 

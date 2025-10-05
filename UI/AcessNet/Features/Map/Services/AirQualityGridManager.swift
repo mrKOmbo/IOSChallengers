@@ -9,6 +9,7 @@ import Foundation
 import CoreLocation
 import Combine
 import SwiftUI
+import MapKit
 
 // MARK: - Air Quality Grid Manager
 
@@ -66,8 +67,9 @@ class AirQualityGridManager: ObservableObject {
             return
         }
 
-        // Marcar como calculando
+        // Limpiar zonas inmediatamente para evitar superposición
         DispatchQueue.main.async {
+            self.zones = []
             self.isCalculating = true
         }
 
@@ -96,6 +98,80 @@ class AirQualityGridManager: ObservableObject {
             self.zones = []
             self.currentCenter = nil
             self.lastCalculation = nil
+        }
+    }
+
+    /// Actualiza las zonas de calidad del aire a lo largo de las rutas con espaciado dinámico
+    /// - Parameter polylines: Array de polylines de todas las rutas
+    func updateZonesAlongRoutes(polylines: [MKPolyline]) {
+        // Limpiar zonas inmediatamente
+        DispatchQueue.main.async {
+            self.zones = []
+            self.isCalculating = true
+        }
+
+        // Calcular zonas en background
+        calculationQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // 1. Calcular longitud total de todas las rutas
+            var totalDistance: CLLocationDistance = 0
+            for polyline in polylines {
+                totalDistance += polyline.totalLength()
+            }
+
+            let totalDistanceKm = totalDistance / 1000.0
+
+            // 2. Calcular espaciado y radio dinámicos
+            let spacing = self.calculateDynamicSpacing(totalDistanceKm: totalDistanceKm)
+            let radius = self.calculateDynamicRadius(spacing: spacing)
+
+            print("📏 Distancia total: \(String(format: "%.1f", totalDistanceKm))km")
+            print("   → Espaciado: \(Int(spacing))m (\(String(format: "%.1f", spacing/1000))km entre círculos)")
+            print("   → Radio: \(Int(radius))m (\(String(format: "%.1f", radius/1000))km de área promediada)")
+
+            // 3. Samplear puntos a lo largo de cada ruta
+            var allSampledPoints: [CLLocationCoordinate2D] = []
+
+            for polyline in polylines {
+                let sampledPoints = self.samplePolylineCoordinates(polyline, interval: spacing)
+                allSampledPoints.append(contentsOf: sampledPoints)
+            }
+
+            print("   → Puntos sampleados: \(allSampledPoints.count) (de \(polylines.count) rutas)")
+
+            // 4. Eliminar puntos duplicados muy cercanos
+            // Usar 40% del spacing como distancia mínima para evitar superposición entre rutas
+            let minDistance = spacing * 0.4
+            let beforeDedup = allSampledPoints.count
+            allSampledPoints = self.removeDuplicatePoints(allSampledPoints, minDistance: minDistance)
+            print("   → Después de dedup: \(allSampledPoints.count) círculos (removidos: \(beforeDedup - allSampledPoints.count))")
+
+            // 5. Generar zonas con promedio de área
+            var newZones: [AirQualityZone] = []
+
+            for point in allSampledPoints {
+                // Calcular promedio de calidad del aire del área
+                let avgAirQuality = self.calculateAreaAverage(center: point, radius: radius)
+
+                let zone = AirQualityZone(
+                    coordinate: point,
+                    radius: radius,
+                    airQuality: avgAirQuality
+                )
+                newZones.append(zone)
+            }
+
+            // 6. Actualizar en main thread
+            DispatchQueue.main.async {
+                self.zones = newZones
+                self.currentCenter = nil
+                self.lastCalculation = Date()
+                self.isCalculating = false
+
+                print("🛣️ Zonas a lo largo de rutas: \(newZones.count) círculos (espaciado: \(Int(spacing))m)")
+                self.logGridStatistics()
+            }
         }
     }
 
@@ -189,6 +265,60 @@ class AirQualityGridManager: ObservableObject {
         return false
     }
 
+    /// Samplea puntos a lo largo de un polyline
+    /// - Parameters:
+    ///   - polyline: Polyline a samplear
+    ///   - interval: Distancia entre puntos en metros
+    /// - Returns: Array de coordenadas sampleadas
+    private func samplePolylineCoordinates(_ polyline: MKPolyline, interval: CLLocationDistance) -> [CLLocationCoordinate2D] {
+        let allCoordinates = polyline.coordinates()
+        guard allCoordinates.count >= 2 else { return allCoordinates }
+
+        var sampledCoordinates: [CLLocationCoordinate2D] = []
+        var accumulatedDistance: CLLocationDistance = 0
+        var nextSampleDistance: CLLocationDistance = 0
+
+        // Siempre incluir primer punto
+        sampledCoordinates.append(allCoordinates[0])
+
+        for i in 0..<allCoordinates.count - 1 {
+            let coord1 = allCoordinates[i]
+            let coord2 = allCoordinates[i + 1]
+            let segmentDistance = coord1.distance(to: coord2)
+
+            accumulatedDistance += segmentDistance
+
+            // Si pasamos el siguiente punto de muestreo
+            while accumulatedDistance >= nextSampleDistance + interval {
+                nextSampleDistance += interval
+
+                // Interpolar punto en el segmento
+                let distanceIntoSegment = nextSampleDistance - (accumulatedDistance - segmentDistance)
+                let fraction = distanceIntoSegment / segmentDistance
+
+                if fraction >= 0 && fraction <= 1 {
+                    let sampledPoint = coord1.interpolate(to: coord2, fraction: fraction)
+                    sampledCoordinates.append(sampledPoint)
+                }
+            }
+        }
+
+        // Siempre incluir último punto
+        if let last = allCoordinates.last {
+            // Verificar si el último punto ya está incluido
+            let lastSampled = sampledCoordinates.last
+            let shouldAddLast = lastSampled == nil ||
+                abs(lastSampled!.latitude - last.latitude) > 0.0001 ||
+                abs(lastSampled!.longitude - last.longitude) > 0.0001
+
+            if shouldAddLast {
+                sampledCoordinates.append(last)
+            }
+        }
+
+        return sampledCoordinates
+    }
+
     /// Calcula el grid de zonas
     /// - Parameter center: Centro del grid
     /// - Returns: Array de zonas
@@ -251,6 +381,82 @@ class AirQualityGridManager: ObservableObject {
            - 🟠 Poor: \(poorCount)
            - 🔴 Unhealthy: \(unhealthyCount)
         """)
+    }
+
+    /// Calcula el espaciado dinámico basado en la distancia total de las rutas
+    private func calculateDynamicSpacing(totalDistanceKm: Double) -> CLLocationDistance {
+        switch totalDistanceKm {
+        case 0..<1:
+            return 400   // Ruta muy corta: 1 círculo cada 400m
+        case 1..<3:
+            return 800   // Ruta corta: 1 círculo cada 800m
+        case 3..<7:
+            return 1500  // Ruta media: 1 círculo cada 1.5km
+        case 7..<15:
+            return 2500  // Ruta larga: 1 círculo cada 2.5km
+        default:
+            return 3500  // Ruta muy larga: 1 círculo cada 3.5km
+        }
+    }
+
+    /// Calcula el radio dinámico basado en el espaciado
+    private func calculateDynamicRadius(spacing: CLLocationDistance) -> CLLocationDistance {
+        return spacing * 0.5  // 50% del espaciado para evitar superposición
+    }
+
+    /// Elimina puntos duplicados muy cercanos
+    private func removeDuplicatePoints(_ points: [CLLocationCoordinate2D], minDistance: CLLocationDistance) -> [CLLocationCoordinate2D] {
+        var uniquePoints: [CLLocationCoordinate2D] = []
+
+        for point in points {
+            var isDuplicate = false
+            for existing in uniquePoints {
+                if point.distance(to: existing) < minDistance {
+                    isDuplicate = true
+                    break
+                }
+            }
+            if !isDuplicate {
+                uniquePoints.append(point)
+            }
+        }
+
+        return uniquePoints
+    }
+
+    /// Calcula el promedio de calidad del aire de un área circular
+    private func calculateAreaAverage(center: CLLocationCoordinate2D, radius: CLLocationDistance) -> AirQualityPoint {
+        var aqiSum = 0.0
+        var pm25Sum = 0.0
+        var pm10Sum = 0.0
+
+        // 9 puntos de muestra: centro + 8 alrededor en círculo
+        let angles: [Double] = [0, 45, 90, 135, 180, 225, 270, 315]
+        var samplePoints: [CLLocationCoordinate2D] = [center]  // Centro
+
+        // Agregar 8 puntos alrededor del centro (70% del radio)
+        for angle in angles {
+            let point = center.coordinate(atDistance: radius * 0.7, bearing: angle)
+            samplePoints.append(point)
+        }
+
+        // Generar calidad del aire para cada punto y promediar
+        for point in samplePoints {
+            let airQuality = dataGenerator.generateAirQuality(for: point, includeExtendedMetrics: false)
+            aqiSum += airQuality.aqi
+            pm25Sum += airQuality.pm25
+            pm10Sum += airQuality.pm10 ?? 0
+        }
+
+        let count = Double(samplePoints.count)
+
+        return AirQualityPoint(
+            coordinate: center,
+            aqi: aqiSum / count,
+            pm25: pm25Sum / count,
+            pm10: pm10Sum / count,
+            timestamp: Date()
+        )
     }
 }
 
