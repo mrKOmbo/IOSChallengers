@@ -332,3 +332,47 @@ class HistoricalWeatherView(APIView):
                 {"error": f"Error al obtener datos históricos: {str(e)}"},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+from adapters.ai.llm_analyzer import AirQualityLLMAnalyzer
+
+class AirQualityAIAnalysisView(APIView):
+    """
+    Análisis inteligente de calidad del aire usando LLM (Groq).
+    GET /api/v1/air/ai-analysis?lat=19.4326&lon=-99.1332&name=CDMX
+    """
+    def get(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lon = float(request.query_params.get("lon"))
+            location_name = request.query_params.get("name", "Ubicación")
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "Parámetros inválidos. Usa 'lat' y 'lon'."},
+                status=http_status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Obtener datos actuales
+        air_provider = OpenAQGridProvider()
+        when = datetime.now(timezone.utc)
+        current = air_provider.get_aqi_cell(lat, lon, when)
+        
+        # Obtener predicción
+        forecast_provider = WAQIForecastProvider()
+        forecast = forecast_provider.get_forecast_with_radius(lat, lon, radius_km=10, hours=48)
+        
+        # Analizar con LLM
+        llm_analyzer = AirQualityLLMAnalyzer()
+        analysis = llm_analyzer.analyze_forecast(
+            current_data=current,
+            forecast_data=forecast,
+            location={"lat": lat, "lon": lon, "name": location_name}
+        )
+        
+        return Response({
+            "location": {"lat": lat, "lon": lon, "name": location_name},
+            "timestamp": when.isoformat(),
+            "current_aqi": current.get('aqi'),
+            "ai_analysis": analysis,
+            "powered_by": "Groq (Llama 3.1)",
+            "data_sources": ["OpenAQ", "WAQI", "Groq AI"]
+        })

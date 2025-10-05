@@ -137,9 +137,9 @@ class OpenAQGridProvider:
             params = {
                 "coordinates": f"{lat},{lon}",
                 "radius": self.radius_m,
-                "limit": 10,
+                "limit": 15,
             }
-            
+                
             logger.info(f"Requesting locations: {locations_url} with params: {params}")
             r = requests.get(locations_url, params=params, headers=headers, timeout=10)
             logger.info(f"Locations Response Status: {r.status_code}")
