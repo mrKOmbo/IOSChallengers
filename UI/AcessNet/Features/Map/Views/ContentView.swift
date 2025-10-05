@@ -264,17 +264,18 @@ struct EnhancedMapView: View {
                 }
             }
 
-            // Air Quality Legend (superior derecha)
+            // Enhanced Air Quality Dashboard (superior derecha)
             if showAirQualityLayer && !isSearchFocused {
                 VStack {
                     HStack {
                         Spacer()
 
-                        AirQualityLegendView(
+                        // Enhanced Dashboard con gráficos y breathability integrado
+                        EnhancedAirQualityDashboard(
                             isExpanded: $showAirQualityLegend,
                             statistics: airQualityGridManager.getStatistics()
                         )
-                        .frame(maxWidth: 280)
+                        .frame(maxWidth: 320)
                         .padding(.trailing)
                     }
                     .padding(.top, AppConstants.safeAreaTop + 80)
@@ -284,19 +285,32 @@ struct EnhancedMapView: View {
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
 
-            // Zone Detail Card (cuando se toca una zona)
+            // Hero Air Quality Card (cuando se toca una zona)
             if showZoneDetail, let zone = selectedZone, !isSearchFocused {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showZoneDetail = false
+                            selectedZone = nil
+                        }
+                    }
+
                 VStack {
                     Spacer()
 
-                    AirQualityZoneDetailCard(zone: zone) {
+                    HeroAirQualityCard(zone: zone) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             showZoneDetail = false
                             selectedZone = nil
                         }
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.horizontal, 20)
                     .padding(.bottom, tabBarHeight + 12)
+
+                    Spacer()
+                        .frame(height: 40)
                 }
             }
 
@@ -474,24 +488,26 @@ struct EnhancedMapView: View {
                     }
                 }
 
-                // 🌍 AIR QUALITY ZONES OVERLAY
+                // 🌍 AIR QUALITY ZONES OVERLAY - Enhanced with Atmospheric Blobs
                 if showAirQualityLayer {
-                    ForEach(airQualityGridManager.zones) { zone in
-                        // MapCircle para cada zona
+                    ForEach(Array(airQualityGridManager.zones.enumerated()), id: \.element.id) { index, zone in
+                        // MapCircle de fondo para cobertura de área
                         MapCircle(center: zone.coordinate, radius: zone.radius)
                             .foregroundStyle(zone.fillColor)
-                            .stroke(zone.strokeColor, lineWidth: 1.5)
+                            .stroke(zone.strokeColor, lineWidth: 0.5)
 
-                        // Anotación central opcional (solo para zonas unhealthy+)
-                        if zone.level.rawValue != "Good" && zone.level.rawValue != "Moderate" {
-                            Annotation("", coordinate: zone.coordinate) {
-                                AirQualityCloudAnnotation(zone: zone, showPulse: zone.level == .unhealthy || zone.level == .severe)
-                                    .onTapGesture {
-                                        handleZoneTap(zone)
-                                    }
+                        // Atmospheric Blob mejorado (todas las zonas)
+                        Annotation("", coordinate: zone.coordinate) {
+                            EnhancedAirQualityOverlay(
+                                zone: zone,
+                                isVisible: showAirQualityLayer,
+                                index: index
+                            )
+                            .onTapGesture {
+                                handleZoneTap(zone)
                             }
-                            .annotationTitles(.hidden)
                         }
+                        .annotationTitles(.hidden)
                     }
                 }
             }
