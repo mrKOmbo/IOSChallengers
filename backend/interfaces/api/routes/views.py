@@ -4,9 +4,8 @@ from rest_framework.response import Response
 from rest_framework import status as http_status
 from datetime import datetime, timezone
 
-from adapters.router.osrm_client import OSRMClient
+from adapters.weather.openweather_provider import OpenWeatherProvider
 from adapters.air.openaq_grid_provider import OpenAQGridProvider
-from application.routes.exposure import ExposureService
 from adapters.air.waqi_forecast_provider import WAQIForecastProvider
 
 class HealthCheckView(APIView):
@@ -87,79 +86,6 @@ class CurrentAQIView(APIView):
                 {"error": f"Error al obtener datos de calidad del aire: {str(e)}"},
                 status=http_status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
-class OptimalRouteView(APIView):
-    """
-    Devuelve una única ruta óptima: balance entre distancia y contaminación del aire.
-    """
-    def get(self, request):
-        try:
-            lat1 = float(request.query_params.get("origin_lat"))
-            lon1 = float(request.query_params.get("origin_lon"))
-            lat2 = float(request.query_params.get("dest_lat"))
-            lon2 = float(request.query_params.get("dest_lon"))
-        except (TypeError, ValueError):
-            return Response({"error": "Parámetros inválidos. Usa origin_lat, origin_lon, dest_lat, dest_lon."}, status=400)
-
-        mode = request.query_params.get("mode", "bike")
-        alpha = float(request.query_params.get("alpha", 0.5))  # peso distancia
-        beta  = float(request.query_params.get("beta", 0.5))   # peso contaminación
-        depart_at = datetime.now(timezone.utc)
-
-        # Clientes
-        router = OSRMClient()
-        air = OpenAQGridProvider()
-        exposure = ExposureService(air)
-
-        # Obtener rutas alternativas
-        routes = router.route([(lon1, lat1), (lon2, lat2)], profile=mode, alternatives=3)
-        if not routes:
-            return Response({"error": "No se encontraron rutas alternativas."}, status=404)
-
-        evaluations = []
-        for r in routes:
-            exp, max_aqi, segs = exposure.score_polyline(r["geometry"], mode, depart_at)
-            avg_aqi = sum(s["aqi"] for s in segs) / len(segs) if segs else 0
-            evaluations.append({
-                "polyline": r["geometry"],
-                "distance": r["distance"],
-                "duration": r["duration"],
-                "exposure_index": exp,
-                "avg_aqi": avg_aqi,
-            })
-
-        # Normalización
-        max_dist = max(e["distance"] for e in evaluations)
-        max_exp = max(e["exposure_index"] for e in evaluations)
-        min_dist = min(e["distance"] for e in evaluations)
-        min_exp = min(e["exposure_index"] for e in evaluations)
-
-        for e in evaluations:
-            norm_dist = (e["distance"] - min_dist) / (max_dist - min_dist + 1e-9)
-            norm_exp  = (e["exposure_index"] - min_exp) / (max_exp - min_exp + 1e-9)
-            e["score"] = alpha * norm_dist + beta * norm_exp
-
-        # Seleccionar la ruta con menor score combinado
-        optimal = min(evaluations, key=lambda x: x["score"])
-
-        return Response({
-            "origin": [lon1, lat1],
-            "destination": [lon2, lat2],
-            "route": {
-                "distance_km": round(optimal["distance"]/1000, 2),
-                "duration_min": round(optimal["duration"]/60, 1),
-                "exposure_index": round(optimal["exposure_index"], 1),
-                "avg_aqi": round(optimal["avg_aqi"], 1),
-                "score": round(optimal["score"], 3),
-                "polyline": optimal["polyline"],
-            },
-            "weights": {"alpha_distance": alpha, "beta_air": beta},
-            "explanation": (
-                "Ruta óptima entre distancia y aire limpio "
-                f"(α={alpha}, β={beta})"
-            ),
-        })
 
 class NearbyAirQualityView(APIView):
     """

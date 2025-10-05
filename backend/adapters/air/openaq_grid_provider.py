@@ -114,7 +114,7 @@ def _aqi_from_pollutants(values: dict) -> int:
 
 class OpenAQGridProvider:
     """Devuelve AQI aproximado en un punto/hora usando OpenAQ (MVP con caché)."""
-    def __init__(self, radius_m=25000, ttl=300):
+    def __init__(self, radius_m=10000, ttl=300):
         self.radius_m = radius_m
         self.ttl = ttl
 
@@ -225,7 +225,7 @@ class OpenAQGridProvider:
         cache.set(key, payload, timeout=self.ttl)
         return payload
 
-    def get_nearby_locations(self, lat: float, lon: float, radius_m: int = 25000, limit: int = 10):
+    def get_nearby_locations(self, lat: float, lon: float, radius_m: int = 10000, limit: int = 10):
         """
         Obtiene múltiples ubicaciones cercanas con sus mediciones de AQI.
         Retorna una lista de zonas con coordenadas, AQI y contaminantes.

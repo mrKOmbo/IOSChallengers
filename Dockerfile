@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdal-bin libgdal-dev \
     proj-bin libproj-dev \
     geos-bin libgeos-dev \
-    postgresql-client \
     curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
