@@ -35,15 +35,6 @@ struct CustomAnnotation: Identifiable {
     }
 }
 
-// MARK: - Destination Point Model
-
-struct DestinationPoint: Identifiable {
-    let id = UUID()
-    let coordinate: CLLocationCoordinate2D
-    let title: String
-    let subtitle: String?
-}
-
 // MARK: - Main Content View
 
 struct ContentView: View {
