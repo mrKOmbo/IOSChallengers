@@ -38,64 +38,19 @@ struct CustomAnnotation: Identifiable {
 // MARK: - Main Content View
 
 struct ContentView: View {
+    @Binding var showBusinessPulse: Bool
     @StateObject private var locationManager = LocationManager()
-    @State private var showPulseOnMap = false
-    @State private var isMenuOpen = false
 
-    let menuWidth: CGFloat = 280
+    init(showBusinessPulse: Binding<Bool>) {
+        self._showBusinessPulse = showBusinessPulse
+    }
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Side Menu
-            SideMenuView(onBusinessToggle: { isActive in
-                self.showPulseOnMap = isActive
-            })
-            .frame(width: menuWidth)
-            .offset(x: isMenuOpen ? 0 : -menuWidth)
-
-            // Main Content
-            mainNavigationView
-                .cornerRadius(isMenuOpen ? 20 : 0)
-                .scaleEffect(isMenuOpen ? 0.82 : 1)
-                .offset(x: isMenuOpen ? menuWidth : 0)
-                .shadow(color: .black.opacity(isMenuOpen ? 0.25 : 0), radius: 10)
-        }
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isMenuOpen)
+        EnhancedMapView(
+            locationManager: locationManager,
+            showPulse: $showBusinessPulse
+        )
         .ignoresSafeArea()
-    }
-
-    private var mainNavigationView: some View {
-        NavigationView {
-            EnhancedMapView(
-                locationManager: locationManager,
-                showPulse: $showPulseOnMap
-            )
-            .ignoresSafeArea()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { isMenuOpen.toggle() }) {
-                        Image(systemName: isMenuOpen ? "xmark" : "line.3.horizontal")
-                            .foregroundColor(.primary)
-                            .font(.title2)
-                            .padding(8)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                    }
-                    .bounceIn()
-                }
-            }
-        }
-        .navigationViewStyle(.stack)
-        .onAppear {
-            configureTransparentNavigationBar()
-        }
-    }
-
-    private func configureTransparentNavigationBar() {
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithTransparentBackground()
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
     }
 }
 
@@ -111,12 +66,15 @@ struct EnhancedMapView: View {
     @State private var tappedCoordinate: CLLocationCoordinate2D?
     @State private var selectedAnnotation: CustomAnnotation?
     @State private var mapStyle: MapStyleType = .hybrid
-    @State private var is3DMode: Bool = false
 
     // MARK: - Routing State
     @StateObject private var routeManager = RouteManager()
     @State private var routingMode: Bool = false
     @State private var destination: DestinationPoint?
+
+    // MARK: - Location Info State
+    @State private var showLocationInfo: Bool = false
+    @State private var selectedLocationInfo: LocationInfo?
 
     // MARK: - Search State
     @StateObject private var searchManager = LocationSearchManager()
@@ -130,7 +88,8 @@ struct EnhancedMapView: View {
     // MARK: - Route Animation State (Optimizado)
     @State private var dashPhase: CGFloat = 0  // Marching ants
 
-    private let bottomBarHeight: CGFloat = UIScreen.main.bounds.height * 0.1
+    // Enhanced tab bar height - usando constante global
+    private let tabBarHeight: CGFloat = AppConstants.enhancedTabBarTotalHeight
 
     // Computed property para verificar si hay ruta activa
     private var hasActiveRoute: Bool {
@@ -193,21 +152,32 @@ struct EnhancedMapView: View {
             }
             .padding(.top, 60)
 
-            // Top buttons (2D/3D and Map Style) - Por debajo del safe area
-            VStack {
-                HStack {
-                    Spacer()
+            // Controles superiores: barra de búsqueda y acciones del mapa
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    SearchBarView(
+                        searchText: $searchManager.searchQuery,
+                        isFocused: $isSearchFocused,
+                        placeholder: "Where to?",
+                        onSubmit: {
+                            // Opcional: submit search
+                        },
+                        onClear: {
+                            searchManager.clearSearch()
+                        }
+                    )
+                    .layoutPriority(1)
+                    .fadeIn(delay: 0.1)
+
                     VStack(spacing: 15) {
-                        // 2D/3D toggle button
                         FloatingActionButton(
-                            icon: is3DMode ? "view.2d" : "view.3d",
+                            icon: "location.fill",
                             color: .green,
                             size: 50
                         ) {
-                            toggle3DMode()
+                            centerOnUser()
                         }
 
-                        // Map style toggle
                         FloatingActionButton(
                             icon: mapStyle.icon,
                             color: .purple,
@@ -216,17 +186,11 @@ struct EnhancedMapView: View {
                             cycleMapStyle()
                         }
                     }
-                    .padding(.trailing, 20)
                 }
-                Spacer()
-            }
-            .padding(.top, 60)
+                .padding(.horizontal)
+                .padding(.top, AppConstants.safeAreaTop + 12)
 
-            // Search Results (arriba de la barra de búsqueda)
-            if !searchManager.searchResults.isEmpty || searchManager.isSearching {
-                VStack {
-                    Spacer()
-
+                if !searchManager.searchResults.isEmpty || searchManager.isSearching {
                     SearchResultsView(
                         results: searchManager.searchResults,
                         isSearching: searchManager.isSearching,
@@ -234,77 +198,88 @@ struct EnhancedMapView: View {
                         onSelect: handleSearchResultSelection
                     )
                     .padding(.horizontal)
-                    .padding(.bottom, 160)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
+                Spacer()
+            }
+
+            // Location Info Card (cuando se hace long press)
+            if !isSearchFocused && showLocationInfo, let locationInfo = selectedLocationInfo {
+                VStack {
+                    Spacer()
+
+                    LocationInfoCard(
+                        locationInfo: locationInfo,
+                        onCalculateRoute: {
+                            // Calcular ruta desde ubicación actual al punto seleccionado
+                            guard let userLocation = locationManager.userLocation else { return }
+
+                            // Ocultar location info card
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showLocationInfo = false
+                            }
+
+                            // Calcular ruta
+                            routeManager.calculateRoute(from: userLocation, to: locationInfo.coordinate)
+
+                            // Hacer zoom para mostrar toda la ruta después de calcularla
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                zoomToRoute()
+                            }
+
+                            // Mostrar toast
+                            showRouteToast(to: locationInfo.title)
+                        },
+                        onCancel: {
+                            // Limpiar destino y ocultar card
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showLocationInfo = false
+                                selectedLocationInfo = nil
+                                destination = nil
+                            }
+                        }
+                    )
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.horizontal)
+                    .padding(.bottom, tabBarHeight + 12)
                 }
             }
 
             // Route Info Card o Calculating Indicator
-            if !isSearchFocused {
+            if !isSearchFocused && !showLocationInfo {
                 VStack {
                     Spacer()
 
-                    HStack(alignment: .bottom, spacing: 12) {
-                        // Contenido de ruta
-                        VStack(spacing: 0) {
-                            if routeManager.isCalculating {
-                                CalculatingRouteView()
-                                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                            } else if let routeInfo = routeManager.currentRoute {
-                                RouteInfoCard(
-                                    routeInfo: routeInfo,
-                                    isCalculating: routeManager.isCalculating,
-                                    onClear: clearRoute,
-                                    onStartNavigation: nil // Opcional: implementar navegación
-                                )
+                    // Contenido de ruta
+                    VStack(spacing: 0) {
+                        if routeManager.isCalculating {
+                            CalculatingRouteView()
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
-                            } else if let errorMessage = routeManager.errorMessage {
-                                RouteErrorView(message: errorMessage, onDismiss: {
-                                    routeManager.clearRoute()
-                                })
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                            }
-                        }
-
-                        // Botón de ubicación al lado de la ruta
-                        if hasActiveRoute {
-                            FloatingActionButton(
-                                icon: "location.fill",
-                                color: .blue,
-                                size: 50
-                            ) {
-                                centerOnUser()
-                            }
+                        } else if let routeInfo = routeManager.currentRoute {
+                            RouteInfoCard(
+                                routeInfo: routeInfo,
+                                isCalculating: routeManager.isCalculating,
+                                onClear: clearRoute,
+                                onStartNavigation: nil // Opcional: implementar navegación
+                            )
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        } else if let errorMessage = routeManager.errorMessage {
+                            RouteErrorView(message: errorMessage, onDismiss: {
+                                routeManager.clearRoute()
+                            })
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.bottom, 160)
+                    .padding(.bottom, tabBarHeight + 12)
                 }
             }
 
-            // Barra de búsqueda inferior
-            VStack {
-                Spacer()
-                SearchBarView(
-                    searchText: $searchManager.searchQuery,
-                    isFocused: $isSearchFocused,
-                    placeholder: "Where to?",
-                    onSubmit: {
-                        // Opcional: submit search
-                    },
-                    onClear: {
-                        searchManager.clearSearch()
-                    }
-                )
-                .padding(.horizontal)
-                .padding(.bottom, 80)
-                .fadeIn(delay: 0.1)
-            }
-
-            // Botones flotantes (ocultar cuando búsqueda está activa o hay ruta)
-            if !isSearchFocused && !hasActiveRoute {
+            // Botones flotantes (ocultar cuando búsqueda está activa, hay ruta, o se muestra location info)
+            if !isSearchFocused && !hasActiveRoute && !showLocationInfo {
                 floatingButtons
-                    .padding(.bottom, 160)
+                    .padding(.bottom, tabBarHeight + 80)
             }
         }
         .ignoresSafeArea()
@@ -344,8 +319,20 @@ struct EnhancedMapView: View {
     // MARK: - Map View Components
 
     private var enhancedMapView: some View {
-        MapReader { proxy in
-            Map(position: $camera) {
+        ZStack {
+            // Gradient background
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(hex: "2b4c9c"),
+                    Color(hex: "65c2c8")
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            MapReader { proxy in
+                Map(position: $camera) {
                 // User location annotation
                 if let location = locationManager.userLocation {
                     Annotation("My Location", coordinate: location) {
@@ -452,8 +439,23 @@ struct EnhancedMapView: View {
                 MapCompass()
                 MapScaleView()
             }
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.5)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
+                    .onEnded { value in
+                        switch value {
+                        case .second(true, let drag):
+                            if let location = drag?.location {
+                                handleLongPress(at: location, with: proxy)
+                            }
+                        default:
+                            break
+                        }
+                    }
+            )
             .onTapGesture(coordinateSpace: .local) { screenPoint in
                 handleMapTap(at: screenPoint, with: proxy)
+            }
             }
         }
     }
@@ -487,6 +489,54 @@ struct EnhancedMapView: View {
         // Removido: modo de agregar alertas manualmente
     }
 
+    private func handleLongPress(at screenPoint: CGPoint, with proxy: MapProxy) {
+        guard let coordinate = proxy.convert(screenPoint, from: .local) else { return }
+
+        // Haptic feedback fuerte para indicar long press detectado
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
+
+        // Establecer destino temporal SIN calcular ruta
+        setDestination(at: coordinate, title: "Punto B", subtitle: nil, calculateRoute: false)
+
+        // Centrar cámara en el punto seleccionado
+        centerCamera(on: coordinate, distance: 800)
+
+        // Obtener información del lugar con reverse geocoding
+        searchManager.reverseGeocode(coordinate: coordinate) { address in
+            // Calcular distancia desde el usuario
+            let distanceText: String
+            if let userLocation = locationManager.userLocation {
+                let userCLLocation = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+                let selectedCLLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                let distance = userCLLocation.distance(from: selectedCLLocation)
+
+                // Formatear distancia
+                if distance < 1000 {
+                    distanceText = String(format: "%.0f m de tu ubicación", distance)
+                } else {
+                    distanceText = String(format: "%.1f km de tu ubicación", distance / 1000.0)
+                }
+            } else {
+                distanceText = "Ubicación desconocida"
+            }
+
+            // Crear LocationInfo
+            let locationInfo = LocationInfo(
+                coordinate: coordinate,
+                title: address ?? "Ubicación Seleccionada",
+                subtitle: address,
+                distanceFromUser: distanceText
+            )
+
+            // Mostrar card con información
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                selectedLocationInfo = locationInfo
+                showLocationInfo = true
+            }
+        }
+    }
+
     private func centerOnUser() {
         guard let location = locationManager.userLocation else { return }
 
@@ -508,23 +558,6 @@ struct EnhancedMapView: View {
         }
     }
 
-    private func toggle3DMode() {
-        guard let location = locationManager.userLocation else { return }
-
-        is3DMode.toggle()
-
-        withAnimation(.easeInOut(duration: 1.0)) {
-            camera = .camera(
-                MapCamera(
-                    centerCoordinate: location,
-                    distance: 1000,
-                    heading: locationManager.heading,
-                    pitch: is3DMode ? 60 : 0
-                )
-            )
-        }
-    }
-
     private func addAlertAtUserLocation() {
         tappedCoordinate = locationManager.userLocation
         mostrarSheet = true
@@ -543,12 +576,7 @@ struct EnhancedMapView: View {
         }
     }
 
-    private func setDestination(at coordinate: CLLocationCoordinate2D, title: String = "Destination", subtitle: String? = nil) {
-        guard let origin = locationManager.userLocation else {
-            print("⚠️ No se puede calcular ruta sin ubicación del usuario")
-            return
-        }
-
+    private func setDestination(at coordinate: CLLocationCoordinate2D, title: String = "Destination", subtitle: String? = nil, calculateRoute: Bool = true) {
         // Establecer destino con nombre
         withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
             destination = DestinationPoint(
@@ -558,12 +586,20 @@ struct EnhancedMapView: View {
             )
         }
 
-        // Calcular ruta
-        routeManager.calculateRoute(from: origin, to: coordinate)
+        // Solo calcular ruta si se solicita
+        if calculateRoute {
+            guard let origin = locationManager.userLocation else {
+                print("⚠️ No se puede calcular ruta sin ubicación del usuario")
+                return
+            }
 
-        // Hacer zoom para mostrar toda la ruta después de calcularla
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            zoomToRoute()
+            // Calcular ruta
+            routeManager.calculateRoute(from: origin, to: coordinate)
+
+            // Hacer zoom para mostrar toda la ruta después de calcularla con delay mayor
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                zoomToRoute()
+            }
         }
     }
 
@@ -577,10 +613,14 @@ struct EnhancedMapView: View {
     private func zoomToRoute() {
         guard let mapRect = routeManager.getRouteBounds() else { return }
 
-        // Convertir MKMapRect a región para la cámara
-        let region = MKCoordinateRegion(mapRect)
+        // Convertir MKMapRect a región para la cámara con padding extra para ver toda la ruta
+        var region = MKCoordinateRegion(mapRect)
 
-        withAnimation(.easeInOut(duration: 1.2)) {
+        // Expandir región 50% para dar espacio visual
+        region.span.latitudeDelta *= 1.5
+        region.span.longitudeDelta *= 1.5
+
+        withAnimation(.easeInOut(duration: 1.5)) {
             camera = .region(region)
         }
     }
@@ -947,6 +987,5 @@ struct AlertTypeButton: View {
 // MARK: - Preview
 
 #Preview {
-    ContentView()
+    ContentView(showBusinessPulse: .constant(false))
 }
-

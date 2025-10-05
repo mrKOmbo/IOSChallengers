@@ -97,10 +97,9 @@ struct SettingsView: View {
                             isOn: .constant(false)
                         )
                     }
-
-                    Spacer(minLength: 100)
                 }
                 .padding(.horizontal)
+                .avoidTabBar(extraPadding: 20)
             }
 
             // Navigation Bar

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var selectedTab: Tab = .home
+    @State private var showBusinessPulse = false
 
     enum Tab {
         case home
@@ -18,94 +19,40 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Content
+            // Content con transiciones fluidas
             Group {
                 switch selectedTab {
                 case .home:
-                    AQIHomeView()
+                    AQIHomeView(showBusinessPulse: $showBusinessPulse)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                        .id(Tab.home)
                 case .map:
-                    ContentView()
+                    ContentView(showBusinessPulse: $showBusinessPulse)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                        .id(Tab.map)
                 case .settings:
                     SettingsView()
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                        .id(Tab.settings)
                 }
             }
             .ignoresSafeArea()
-            // Custom Tab Bar
-            CustomTabBar(selectedTab: $selectedTab)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedTab)
+
+            // Enhanced Tab Bar Premium
+            EnhancedTabBar(selectedTab: $selectedTab)
         }
         .ignoresSafeArea(edges: .bottom)
         .ignoresSafeArea(.keyboard)
-    }
-}
-
-// MARK: - Custom Tab Bar
-
-struct CustomTabBar: View {
-    @Binding var selectedTab: MainTabView.Tab
-
-    var body: some View {
-        HStack(spacing: 0) {
-            TabBarButton(
-                icon: "house.fill",
-                title: "",
-                isSelected: selectedTab == .home
-            ) {
-                selectedTab = .home
-            }
-
-            TabBarButton(
-                icon: "location.fill",
-                title: "",
-                isSelected: selectedTab == .map
-            ) {
-                selectedTab = .map
-            }
-
-            TabBarButton(
-                icon: "gearshape.fill",
-                title: "",
-                isSelected: selectedTab == .settings
-            ) {
-                selectedTab = .settings
-            }
-        }
-        .padding(.horizontal, 4)
-        .padding(.top, 20)
-        .padding(.bottom, 20)
-        .background(
-            Rectangle()
-                .fill(selectedTab == .map ? AnyShapeStyle(Color.clear) : AnyShapeStyle(.ultraThinMaterial))
-                .shadow(color: selectedTab == .map ? .clear : .black.opacity(0.15), radius: 12, x: 0, y: -5)
-        )
-    }
-}
-
-struct TabBarButton: View {
-    let icon: String
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? Color("AccentColor") : .white.opacity(0.5))
-                    .frame(height: 28)
-
-                if !title.isEmpty {
-                    Text(title)
-                        .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? Color("AccentColor") : .white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-        }
     }
 }
 
@@ -114,4 +61,3 @@ struct TabBarButton: View {
 #Preview {
     MainTabView()
 }
-

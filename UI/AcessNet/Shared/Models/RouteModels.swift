@@ -62,6 +62,31 @@ struct DestinationPoint: Identifiable, Equatable {
     }
 }
 
+// MARK: - Location Info
+
+/// Información de una ubicación seleccionada (antes de calcular ruta)
+struct LocationInfo: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let title: String
+    let subtitle: String?
+    let distanceFromUser: String
+
+    init(coordinate: CLLocationCoordinate2D, title: String, subtitle: String? = nil, distanceFromUser: String) {
+        self.coordinate = coordinate
+        self.title = title
+        self.subtitle = subtitle
+        self.distanceFromUser = distanceFromUser
+    }
+
+    /// Formatea las coordenadas para mostrar
+    var coordinatesFormatted: String {
+        let lat = String(format: "%.4f", coordinate.latitude)
+        let lon = String(format: "%.4f", coordinate.longitude)
+        return "\(lat), \(lon)"
+    }
+}
+
 // MARK: - Route Info
 
 /// Información procesada de una ruta
